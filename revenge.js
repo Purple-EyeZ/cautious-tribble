@@ -53,12 +53,13 @@
     });
     return _noopPromise.apply(this, arguments);
   }
-  var objectSeal;
+  var objectSeal, sleep;
   var init_functions = __esm({
     "libraries/utils/src/functions.ts"() {
       "use strict";
       init_async_to_generator();
       objectSeal = Object.seal;
+      sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     }
   });
 
@@ -857,20 +858,20 @@
           return findByProps.eager(prop, ...filterProps)?.[prop];
         }
       });
-      findBySingleProp = Object.assign(function findBySinglePropLazy(name, returnDefaultExport = true) {
-        return find(returnDefaultExport ? bySingleProp(name) : bySingleProp.raw(name));
+      findBySingleProp = Object.assign(function findBySinglePropLazy(name) {
+        return find(bySingleProp(name));
       }, {
-        async: function findBySinglePropAsync(name, returnDefaultExport = true, timeout = 1e3) {
+        async: function findBySinglePropAsync(name, timeout = 1e3) {
           return new Promise((resolve) => {
             var id = setTimeout(() => resolve(void 0), timeout);
-            findBySingleProp(name, returnDefaultExport)[lazyContextSymbol].getExports((exp) => {
+            findBySingleProp(name)[lazyContextSymbol].getExports((exp) => {
               clearTimeout(id);
               resolve(exp);
             });
           });
         },
-        eager: function findBySinglePropEager(name, returnDefaultExport = true) {
-          return find.eager(returnDefaultExport ? bySingleProp(name) : bySingleProp.raw(name));
+        eager: function findBySinglePropEager(name) {
+          return find.eager(bySingleProp(name));
         }
       });
       findByQuery = Object.assign(function findByQueryLazy() {
@@ -1028,6 +1029,7 @@
          * - `b`: Blacklist freezing module
          * - `d`: Block Discord analytics
          * - `s`: Block Sentry initialization
+         * - `m`: Fix Moment locale
          */
         patchableModules: {},
         /**
@@ -1039,7 +1041,7 @@
   });
 
   // libraries/modules/src/metro/patches.ts
-  function initializeModulePatches(patcher5, logger3, metroModules) {
+  function initializeModulePatches(patcher5, logger5, metroModules) {
     subscribePatchableModule("f", (exports) => exports.fileFinishedImporting, (exports) => {
       patcher5.before(exports, "fileFinishedImporting", ([filePath]) => {
         var importingModuleId2 = getImportingModuleId();
@@ -1065,22 +1067,29 @@
     }, (_2, id) => {
       if (!isModuleBlacklisted(id + 1)) {
         blacklistModule(id + 1);
-        logger3.log(`Blacklisted module ${id + 1} as it causes freeze when initialized`);
+        logger5.log(`Blacklisted module ${id + 1} as it causes freeze when initialized`);
       }
     });
     subscribePatchableModule("s", (m2) => m2.initSentry, (m2) => m2.initSentry = noop);
     subscribePatchableModule("d", (m2) => m2.default?.track && m2.default.trackMaker, (m2) => m2.default.track = () => noopPromise);
+    subscribePatchableModule("m", (m2) => m2.isMoment, (moment) => {
+      patcher5.instead(moment, "defineLocale", (args, orig) => {
+        var origLocale = moment.locale();
+        orig(...args);
+        moment.locale(origLocale);
+      });
+    });
   }
   function subscribePatchableModule(patchId, filter, patch) {
     var cachedId = cache.patchableModules[patchId];
     var unsub = cachedId ? subscribeModule(cachedId, (exports) => {
-      unsub();
       patch(exports, cachedId);
     }) : subscribeModule.all((id, exports) => {
       if (!filter(exports, id)) return;
       unsub();
       cache.patchableModules[patchId] = id;
       patch(exports, id);
+      subscribePatchableModule(patchId, filter, patch);
     });
   }
   var init_patches = __esm({
@@ -1131,23 +1140,16 @@
   }
   function tryHookModule(id, metroModule) {
     if (isModuleBlacklisted(id)) return;
+    if (metroModule.isInitialized) {
+      var subs = subscriptions.get(id);
+      if (subs) for (var sub of subs) sub(id, metroModule.publicModule.exports);
+      for (var sub1 of allSubscriptionSet) sub1(id, metroModule.publicModule.exports);
+    }
     if (metroModule.factory) {
       var unpatch2 = patcher.instead(metroModule, "factory", (args, origFunc) => {
         var originalImportingId = importingModuleId;
         importingModuleId = id;
-        var { 1: metroRequire, 4: moduleObject } = args;
-        args[2] = (id2) => {
-          var exps = metroRequire(id2);
-          return exps?.__esModule ? exps.default : exps;
-        };
-        args[3] = (id2) => {
-          var exps = metroRequire(id2);
-          if (exps?.__esModule) return exps;
-          return {
-            default: exps,
-            ...exps
-          };
-        };
+        var { 4: moduleObject } = args;
         try {
           origFunc(...args);
         } catch (error) {
@@ -1157,9 +1159,9 @@
         }
         if (isModuleExportsBad(moduleObject.exports)) blacklistModule(id);
         else {
-          var subs = subscriptions.get(id);
-          if (subs) for (var sub of subs) sub(id, moduleObject.exports);
-          for (var sub1 of allSubscriptionSet) sub1(id, moduleObject.exports);
+          var subs2 = subscriptions.get(id);
+          if (subs2) for (var sub2 of subs2) sub2(id, moduleObject.exports);
+          for (var sub12 of allSubscriptionSet) sub12(id, moduleObject.exports);
         }
         importingModuleId = originalImportingId;
       }, "moduleFactory");
@@ -1172,17 +1174,13 @@
     _initializeModules = _async_to_generator(function* () {
       var metroModules = getMetroModules();
       if (metroModules[IndexMetroModuleId]?.isInitialized) throw new Error("Metro modules has already been initialized");
-      var cacheRestoredPromise = restoreCache().then((result) => {
-        recordTimestamp("Modules_TriedRestoreCache");
-        return result;
-      });
+      var cacheRestored = yield restoreCache();
+      recordTimestamp("Modules_TriedRestoreCache");
       initializeModulePatches(patcher, logger, metroModules);
-      var moduleIds = [
-        ...metroDependencies
-      ];
-      var lastHookedIndex = 0;
-      for (; lastHookedIndex < Math.min(moduleIds.length, SafeModuleHookAmountBeforeDefer); lastHookedIndex++) {
-        var id = moduleIds[lastHookedIndex];
+      var moduleIds = metroDependencies.values();
+      var hookCount = 0;
+      for (; hookCount < Math.min(metroDependencies.size, SafeModuleHookAmountBeforeDefer); hookCount++) {
+        var id = moduleIds.next().value;
         var metroModule = metroModules[id];
         tryHookModule(id, metroModule);
       }
@@ -1190,14 +1188,15 @@
       __r(IndexMetroModuleId);
       recordTimestamp("Modules_IndexRequired");
       setImmediate(() => {
-        for (; lastHookedIndex < moduleIds.length; lastHookedIndex++) {
-          var id2 = moduleIds[lastHookedIndex];
+        var id2 = moduleIds.next().value;
+        if (!id2) return;
+        do {
           var metroModule2 = metroModules[id2];
           tryHookModule(id2, metroModule2);
-        }
+        } while (id2 = moduleIds.next().value);
         recordTimestamp("Modules_HookedFactories");
       });
-      if (!(yield cacheRestoredPromise)) {
+      if (!cacheRestored) {
         var unpatch2 = patcher.before(ReactNative.AppRegistry, "runApplication", () => {
           unpatch2();
           requireAssetModules();
@@ -1446,18 +1445,20 @@
     TableRadioRow: () => TableRadioRow,
     TableRow: () => TableRow,
     TableRowGroup: () => TableRowGroup,
+    TableRowGroupTitle: () => TableRowGroupTitle,
     TableRowIcon: () => TableRowIcon,
     TableRowTrailingText: () => TableRowTrailingText,
     TableSwitch: () => TableSwitch,
     TableSwitchRow: () => TableSwitchRow,
     Text: () => Text,
     TextArea: () => TextArea,
+    TextField: () => TextField,
     TextInput: () => TextInput,
     TwinButtons: () => TwinButtons,
     dismissAlerts: () => dismissAlerts,
     openAlert: () => openAlert
   });
-  var SafeAreaProvider, SafeAreaView, TwinButtons, Button, IconButton, ImageButton, FloatingActionButton, RowButton, TableRow, TableSwitchRow, TableRowGroup, TableRowIcon, TableRadioGroup, TableCheckboxRow, TableRadioRow, AlertModal, AlertActionButton, dismissAlerts, openAlert, TextInput, TextArea, GhostInput, Card, Stack, Slider, Text, PressableScale, TableRowTrailingText, TableSwitch, TableRadio, TableCheckbox, FormSwitch, FormRadio, FormCheckbox, FlashList;
+  var SafeAreaProvider, SafeAreaView, TwinButtons, Button, IconButton, ImageButton, FloatingActionButton, RowButton, TableRow, TableSwitchRow, TableRowGroup, TableRowGroupTitle, TableRowIcon, TableRadioGroup, TableCheckboxRow, TableRadioRow, AlertModal, AlertActionButton, dismissAlerts, openAlert, TextInput, TextField, TextArea, GhostInput, Card, Stack, Slider, Text, PressableScale, TableRowTrailingText, TableSwitch, TableRadio, TableCheckbox, FormSwitch, FormRadio, FormCheckbox, FlashList;
   var init_components = __esm({
     "libraries/modules/src/common/components.ts"() {
       "use strict";
@@ -1480,6 +1481,7 @@
         ),
         TableSwitchRow,
         TableRowGroup,
+        TableRowGroupTitle,
         TableRowIcon,
         TableRadioGroup,
         TableCheckboxRow,
@@ -1495,6 +1497,7 @@
           // Inputs
           TextInput
         ),
+        TextField,
         TextArea,
         GhostInput,
         Card: (
@@ -1510,7 +1513,7 @@
           // Text
           Text
         )
-      } = lazyDestructure(() => findByProps.eager("TextInput", "ContextMenu")));
+      } = lazyDestructure(() => findByProps.eager("TextField", "ContextMenu")));
       PressableScale = findProp("PressableScale");
       TableRowTrailingText = findProp("TableRowTrailingText");
       TableSwitch = findBySingleProp("FormSwitch");
@@ -1740,6 +1743,423 @@
       Fragment = Symbol.for("react.fragment");
       jsx = (...args) => jsxRuntime.jsx(...unproxyFirstArg(args));
       jsxs = (...args) => jsxRuntime.jsxs(...unproxyFirstArg(args));
+    }
+  });
+
+  // libraries/app/src/components/ErrorBoundaryScreen.tsx
+  var ErrorBoundaryScreen_exports = {};
+  __export(ErrorBoundaryScreen_exports, {
+    LabeledCard: () => LabeledCard,
+    default: () => ErrorBoundaryScreen
+  });
+  function ErrorBoundaryScreen(props) {
+    var errorBoundaryStyles = useErrorBoundaryStyles();
+    var error = props.error;
+    return /* @__PURE__ */ jsxs(SafeAreaView, {
+      style: errorBoundaryStyles.view,
+      children: [
+        /* @__PURE__ */ jsxs(ReactNative.View, {
+          style: {
+            gap: 4
+          },
+          children: [
+            /* @__PURE__ */ jsx(Text, {
+              variant: "display-lg",
+              children: "Error!"
+            }),
+            /* @__PURE__ */ jsxs(Text, {
+              variant: "text-md/normal",
+              children: [
+                "An error was thrown while rendering components. This could be caused by plugins, Revenge or Discord.",
+                " ",
+                Math.floor(Number(ClientInfoModule.Build) % 1e3 / 100) > 0 ? /* @__PURE__ */ jsx(Text, {
+                  variant: "text-md/normal",
+                  color: "text-danger",
+                  children: "You are not on a stable version of Discord which may explain why you are experiencing this issue."
+                }) : null
+              ]
+            }),
+            /* @__PURE__ */ jsxs(Text, {
+              variant: "text-sm/normal",
+              color: "text-muted",
+              children: [
+                ClientInfoModule.Version,
+                " (",
+                ClientInfoModule.Build,
+                ") \u2022 Revenge ",
+                "local",
+                " (",
+                "dba5438",
+                false ? "-dirty" : "",
+                ")"
+              ]
+            })
+          ]
+        }),
+        /* @__PURE__ */ jsxs(LabeledCard, {
+          label: "Error",
+          rawContent: getErrorStack(error),
+          children: [
+            /* @__PURE__ */ jsx(Text, {
+              variant: "text-md/medium",
+              children: String(error)
+            }),
+            error instanceof Error && error.stack && /* @__PURE__ */ jsxs(Fragment, {
+              children: [
+                /* @__PURE__ */ jsx(Text, {
+                  variant: "heading-xl/semibold",
+                  children: "Call Stack"
+                }),
+                /* @__PURE__ */ jsx(ReactNative.ScrollView, {
+                  style: styles.nestedView,
+                  fadingEdgeLength: 64,
+                  children: parseStackTrace(error.stack?.slice(String(error).length + 1)).map(({ at, file, line, column }) => (
+                    // biome-ignore lint/correctness/useJsxKeyInIterable: This never gets rerendered
+                    /* @__PURE__ */ jsxs(Text, {
+                      variant: "heading-md/extrabold",
+                      style: {
+                        fontFamily: "monospace",
+                        fontWeight: "bold"
+                      },
+                      children: [
+                        at,
+                        "\n",
+                        /* @__PURE__ */ jsxs(Text, {
+                          variant: "text-sm/medium",
+                          style: {
+                            fontFamily: "monospace"
+                          },
+                          color: "text-muted",
+                          children: [
+                            file,
+                            typeof line === "number" && typeof column === "number" && /* @__PURE__ */ jsxs(Fragment, {
+                              children: [
+                                ":",
+                                line,
+                                ":",
+                                column
+                              ]
+                            })
+                          ]
+                        })
+                      ]
+                    })
+                  ))
+                })
+              ]
+            })
+          ]
+        }),
+        error instanceof Error && "componentStack" in error && /* @__PURE__ */ jsx(LabeledCard, {
+          scrollable: true,
+          label: "Component Stack",
+          style: {
+            flex: 1
+          },
+          rawContent: error.componentStack,
+          children: /* @__PURE__ */ jsx(Text, {
+            selectable: true,
+            variant: "text-md/medium",
+            children: [
+              ...error.componentStack.slice(1).split("\n").map((line) => [
+                "<",
+                /* @__PURE__ */ jsx(Text, {
+                  variant: "text-md/bold",
+                  children: line.slice(7)
+                }),
+                "/>\n"
+              ])
+            ]
+          })
+        }),
+        /* @__PURE__ */ jsxs(Card, {
+          style: {
+            gap: 16,
+            flexDirection: "row"
+          },
+          children: [
+            /* @__PURE__ */ jsx(Button, {
+              style: {
+                flex: 1
+              },
+              variant: "destructive",
+              text: "Reload Discord",
+              onPress: props.reload
+            }),
+            /* @__PURE__ */ jsx(Button, {
+              style: {
+                flex: 1
+              },
+              text: "Retry Render",
+              onPress: props.rerender
+            })
+          ]
+        })
+      ]
+    });
+  }
+  function LabeledCard(props) {
+    var ViewComponent = props.scrollable ? ReactNative.ScrollView : ReactNative.View;
+    return /* @__PURE__ */ jsxs(Card, {
+      ...props,
+      style: [
+        styles.nestedView,
+        ...Array.isArray(props.style) ? props.style : [
+          props.style
+        ]
+      ],
+      children: [
+        /* @__PURE__ */ jsxs(ReactNative.View, {
+          style: {
+            flexDirection: "row",
+            alignItems: "center"
+          },
+          children: [
+            /* @__PURE__ */ jsx(Text, {
+              variant: "heading-xl/semibold",
+              style: styles.headerText,
+              children: props.label
+            }),
+            props.rawContent && /* @__PURE__ */ jsx(Button, {
+              variant: "secondary",
+              size: "sm",
+              text: "Copy",
+              onPress: () => clipboard.setString(props.rawContent)
+            })
+          ]
+        }),
+        /* @__PURE__ */ jsx(ViewComponent, {
+          style: styles.nestedView,
+          fadingEdgeLength: 32,
+          children: props.children
+        })
+      ]
+    });
+  }
+  function parseStackTrace(stackTrace) {
+    var frames = [];
+    var lines = stackTrace.split("\n");
+    for (var line of lines) {
+      var match = StackFrameRegex.exec(line.trim());
+      if (match) {
+        var at = void 0;
+        var path = void 0;
+        var ln = null;
+        var col = null;
+        if (match[3] && match[4]) {
+          at = match[1];
+          path = match[2];
+          ln = Number(match[3]);
+          col = Number(match[4]);
+        } else {
+          at = match[5];
+          path = match[6];
+        }
+        if (path === IndexBundleFilePath) path = "(Discord)";
+        frames.push({
+          at,
+          file: path,
+          line: ln,
+          column: col
+        });
+      } else {
+        frames.push({
+          at: "UNABLE TO PARSE LINE",
+          file: line,
+          line: null,
+          column: null
+        });
+      }
+    }
+    return frames;
+  }
+  var useErrorBoundaryStyles, styles, IndexBundleFilePath, StackFrameRegex;
+  var init_ErrorBoundaryScreen = __esm({
+    "libraries/app/src/components/ErrorBoundaryScreen.tsx"() {
+      "use strict";
+      init_react_jsx_runtime();
+      init_common();
+      init_components();
+      init_native();
+      init_colors();
+      init_errors();
+      useErrorBoundaryStyles = createStyles({
+        view: {
+          backgroundColor: SemanticColor.BG_BASE_SECONDARY,
+          paddingHorizontal: 16,
+          paddingVertical: 24,
+          flex: 1,
+          gap: 16
+        }
+      });
+      styles = ReactNative.StyleSheet.create({
+        nestedView: {
+          gap: 8,
+          flex: 1
+        },
+        headerText: {
+          flexGrow: 1
+        }
+      });
+      IndexBundleFilePath = HermesInternal.getFunctionLocation(__r).fileName;
+      StackFrameRegex = /at (.+) \(([^:]+):(\d+):(\d+)\)|at (.+)? \(([^)]+)\)/;
+    }
+  });
+
+  // libraries/app/src/index.tsx
+  var src_exports2 = {};
+  __export(src_exports2, {
+    AppLibrary: () => AppLibrary,
+    afterAppInitialized: () => afterAppInitialized,
+    afterAppRendered: () => afterAppRendered,
+    errorBoundaryPatchedPromise: () => errorBoundaryPatchedPromise,
+    isAppInitialized: () => isAppInitialized,
+    isAppRendered: () => isAppRendered
+  });
+  function afterAppInitialized(callback) {
+    if (isAppInitialized) throw new Error("Cannot attach a callback after the app has already been initialized");
+    initializeCallbacks.add(callback);
+  }
+  function afterAppRendered(callback) {
+    if (isAppRendered) throw new Error("Cannot attach a callback after the App component has been rendered");
+    renderCallbacks.add(callback);
+  }
+  var patcher2, logger2, initializeCallbacks, renderCallbacks, isAppInitialized, isAppRendered, unpatchRunApplication, unpatchCreateElement, resolveErrorBoundaryPatched, errorBoundaryPatchedPromise, afterErrorBoundaryPatchable, AppLibrary;
+  var init_src4 = __esm({
+    "libraries/app/src/index.tsx"() {
+      "use strict";
+      init_async_to_generator();
+      init_react_jsx_runtime();
+      init_src();
+      init_finders();
+      init_native();
+      init_src2();
+      init_library();
+      patcher2 = createPatcherInstance("revenge.library.app");
+      logger2 = createLogger("app");
+      logger2.log("Library loaded");
+      initializeCallbacks = /* @__PURE__ */ new Set();
+      renderCallbacks = /* @__PURE__ */ new Set();
+      isAppInitialized = false;
+      isAppRendered = false;
+      afterAppInitialized(() => isAppInitialized = true);
+      afterAppRendered(() => isAppRendered = true);
+      unpatchRunApplication = patcher2.after(ReactNative.AppRegistry, "runApplication", () => {
+        unpatchRunApplication();
+        recordTimestamp("App_RunApplicationCalled");
+        logger2.log("AppRegistry.runApplication called");
+        for (var callback of initializeCallbacks) callback();
+        recordTimestamp("App_AfterRunCallbacks");
+        logger2.log("Initialized callbacks called");
+      }, "runInitializeCallbacks");
+      unpatchCreateElement = patcher2.after(React, "createElement", () => {
+        unpatchCreateElement();
+        recordTimestamp("App_CreateElementCalled");
+        logger2.log("React.createElement called");
+        for (var callback of renderCallbacks) callback();
+        logger2.log("Rendered callbacks called");
+      }, "runRenderCallbacks");
+      errorBoundaryPatchedPromise = new Promise((resolve) => resolveErrorBoundaryPatched = resolve);
+      afterErrorBoundaryPatchable = ReactNative.Platform.OS === "ios" ? afterAppRendered : afterAppInitialized;
+      afterErrorBoundaryPatchable(/* @__PURE__ */ function() {
+        var _patchErrorBoundary = _async_to_generator(function* () {
+          var { default: Screen } = yield Promise.resolve().then(() => (init_ErrorBoundaryScreen(), ErrorBoundaryScreen_exports));
+          setImmediate(() => {
+            patcher2.after.await(findByName.async("ErrorBoundary").then((it) => it.prototype), "render", function() {
+              if (this.state.error) return /* @__PURE__ */ jsx(Screen, {
+                error: this.state.error,
+                rerender: () => this.setState({
+                  error: null,
+                  info: null
+                }),
+                reload: this.handleReload
+              });
+            }, "patchErrorBoundary");
+            logger2.log("ErrorBoundary patched");
+            resolveErrorBoundaryPatched();
+          });
+        });
+        function patchErrorBoundary() {
+          return _patchErrorBoundary.apply(this, arguments);
+        }
+        return patchErrorBoundary;
+      }());
+      AppLibrary = {
+        /**
+         * Whether the app has finished initializing
+         */
+        get initialized() {
+          return isAppInitialized;
+        },
+        /**
+         * Whether the App component has been rendered
+         */
+        get rendered() {
+          return isAppRendered;
+        },
+        /**
+         * Attaches a callback to be called when the app has been rendered
+         * @param callback The callback to be called
+         */
+        afterRendered: afterAppRendered,
+        /**
+         * Attaches a callback to be called when the app has been initialized
+         * @param callback The callback to be called
+         */
+        afterInitialized: afterAppInitialized,
+        /**
+         * Reloads the app
+         */
+        reload: () => BundleUpdaterManager.reload()
+      };
+    }
+  });
+
+  // libraries/assets/src/index.ts
+  var src_exports3 = {};
+  __export(src_exports3, {
+    AssetsLibrary: () => AssetsLibrary
+  });
+  function getAssetByName(name) {
+    return getAssetByIndex(cache.assets[name]);
+  }
+  function getAssetByIndex(index) {
+    return assets[index];
+  }
+  function getAssetIndexByName(name) {
+    var cachedId = cache.assets[name];
+    if (cachedId) return cachedId;
+    var moduleId = cache.assetModules[name];
+    if (!moduleId) return;
+    return cache.assets[name] = requireModule(moduleId);
+  }
+  var patcher3, assets, AssetsLibrary;
+  var init_src5 = __esm({
+    "libraries/assets/src/index.ts"() {
+      "use strict";
+      init_common();
+      init_metro();
+      init_src2();
+      patcher3 = createPatcherInstance("revenge.library.assets");
+      patcher3.after(assetsRegistry, "registerAsset", ([asset], index) => {
+        var moduleId = getImportingModuleId();
+        cacheAsset(asset.name, index, moduleId);
+      }, "patchRegisterAsset");
+      assets = new Proxy(Object.fromEntries(Object.entries(cache.assets).map(([key, index]) => [
+        key,
+        assetsRegistry.getAssetByID(index)
+      ])), {
+        get(cache2, prop) {
+          if (cache2[prop]) return cache2[prop];
+          return assetsRegistry.getAssetByID(Number(prop));
+        }
+      });
+      AssetsLibrary = {
+        assets,
+        getByName: getAssetByName,
+        getIndexByName: getAssetIndexByName,
+        getByIndex: getAssetByIndex
+      };
     }
   });
 
@@ -2323,8 +2743,8 @@
   });
 
   // libraries/storage/src/index.ts
-  var src_exports2 = {};
-  __export(src_exports2, {
+  var src_exports4 = {};
+  __export(src_exports4, {
     awaitStorage: () => awaitStorage,
     createStorage: () => createStorage,
     getPreloadedStorage: () => getPreloadedStorage,
@@ -2352,7 +2772,8 @@
         }
         return FileModule.writeFile("documents", path, JSON.stringify(data), "utf8");
       },
-      exists: () => FileModule.fileExists(actualPath)
+      exists: () => FileModule.fileExists(actualPath),
+      delete: () => FileModule.removeFile("documents", path)
     };
     return file;
   }
@@ -2384,10 +2805,12 @@
     var readyPromise = new Promise((r) => resolve = r);
     var resolve;
     var proxy;
+    var backend = createJSONFile(path);
     var context = {
       emitter: new EventEmitter(),
       ready: false,
-      readyPromise
+      readyPromise,
+      file: backend
     };
     var callback = (data) => {
       var observable = v.from(data);
@@ -2410,7 +2833,6 @@
       resolve();
       return proxy = _proxy;
     };
-    var backend = createJSONFile(path);
     if (loadedStorages[path]) {
       callback(loadedStorages[path]);
     } else {
@@ -2478,7 +2900,7 @@
     return loadedStorages[path];
   }
   var storageContextSymbol, loadedStorages;
-  var init_src4 = __esm({
+  var init_src6 = __esm({
     "libraries/storage/src/index.ts"() {
       "use strict";
       init_async_to_generator();
@@ -2491,432 +2913,23 @@
   });
 
   // libraries/preferences/src/index.ts
-  var src_exports3 = {};
-  __export(src_exports3, {
+  var src_exports5 = {};
+  __export(src_exports5, {
     settings: () => settings
   });
   var settings;
-  var init_src5 = __esm({
+  var init_src7 = __esm({
     "libraries/preferences/src/index.ts"() {
       "use strict";
-      init_src4();
+      init_src6();
       settings = createStorage("revenge/settings.json", {
         initial: {
           safeMode: {
             enabled: false,
             enabledNextLaunch: false
-          },
-          developer: {
-            settingsPageShown: false,
-            patchErrorBoundary: true
           }
         }
       });
-    }
-  });
-
-  // libraries/app/src/components/ErrorBoundaryScreen.tsx
-  var ErrorBoundaryScreen_exports = {};
-  __export(ErrorBoundaryScreen_exports, {
-    LabeledCard: () => LabeledCard,
-    default: () => ErrorBoundaryScreen
-  });
-  function ErrorBoundaryScreen(props) {
-    var errorBoundaryStyles = useErrorBoundaryStyles();
-    var error = props.error;
-    return /* @__PURE__ */ jsxs(SafeAreaView, {
-      style: errorBoundaryStyles.view,
-      children: [
-        /* @__PURE__ */ jsxs(ReactNative.View, {
-          style: {
-            gap: 4
-          },
-          children: [
-            /* @__PURE__ */ jsx(Text, {
-              variant: "display-lg",
-              children: "Error!"
-            }),
-            /* @__PURE__ */ jsxs(Text, {
-              variant: "text-md/normal",
-              children: [
-                "An error was thrown while rendering components. This could be caused by plugins, Revenge or Discord.",
-                " ",
-                Math.floor(Number(ClientInfoModule.Build) % 1e3 / 100) > 0 ? /* @__PURE__ */ jsx(Text, {
-                  variant: "text-md/normal",
-                  color: "text-danger",
-                  children: "You are not on a stable version of Discord which may explain why you are experiencing this issue."
-                }) : null
-              ]
-            }),
-            /* @__PURE__ */ jsxs(Text, {
-              variant: "text-sm/normal",
-              color: "text-muted",
-              children: [
-                ClientInfoModule.Version,
-                " (",
-                ClientInfoModule.Build,
-                ") \u2022 Revenge ",
-                "local"
-              ]
-            })
-          ]
-        }),
-        /* @__PURE__ */ jsxs(LabeledCard, {
-          label: "Error",
-          rawContent: getErrorStack(error),
-          children: [
-            /* @__PURE__ */ jsx(Text, {
-              variant: "text-md/medium",
-              children: String(error)
-            }),
-            error instanceof Error && error.stack && /* @__PURE__ */ jsxs(Fragment, {
-              children: [
-                /* @__PURE__ */ jsx(Text, {
-                  variant: "heading-xl/semibold",
-                  children: "Call Stack"
-                }),
-                /* @__PURE__ */ jsx(ReactNative.ScrollView, {
-                  style: styles.nestedView,
-                  fadingEdgeLength: 64,
-                  children: parseStackTrace(error.stack?.slice(String(error).length + 1)).map(({ at, file, line, column }) => (
-                    // biome-ignore lint/correctness/useJsxKeyInIterable: This never gets rerendered
-                    /* @__PURE__ */ jsxs(Text, {
-                      variant: "heading-md/extrabold",
-                      style: {
-                        fontFamily: "monospace",
-                        fontWeight: "bold"
-                      },
-                      children: [
-                        at,
-                        "\n",
-                        /* @__PURE__ */ jsxs(Text, {
-                          variant: "text-sm/medium",
-                          style: {
-                            fontFamily: "monospace"
-                          },
-                          color: "text-muted",
-                          children: [
-                            file,
-                            typeof line === "number" && typeof column === "number" && /* @__PURE__ */ jsxs(Fragment, {
-                              children: [
-                                ":",
-                                line,
-                                ":",
-                                column
-                              ]
-                            })
-                          ]
-                        })
-                      ]
-                    })
-                  ))
-                })
-              ]
-            })
-          ]
-        }),
-        error instanceof Error && "componentStack" in error && /* @__PURE__ */ jsx(LabeledCard, {
-          scrollable: true,
-          label: "Component Stack",
-          style: {
-            flex: 1
-          },
-          rawContent: error.componentStack,
-          children: /* @__PURE__ */ jsx(Text, {
-            selectable: true,
-            variant: "text-md/medium",
-            children: [
-              ...error.componentStack.slice(1).split("\n").map((line) => [
-                "<",
-                /* @__PURE__ */ jsx(Text, {
-                  variant: "text-md/bold",
-                  children: line.slice(7)
-                }),
-                "/>\n"
-              ])
-            ]
-          })
-        }),
-        /* @__PURE__ */ jsxs(Card, {
-          style: {
-            gap: 16,
-            flexDirection: "row"
-          },
-          children: [
-            /* @__PURE__ */ jsx(Button, {
-              style: {
-                flex: 1
-              },
-              variant: "destructive",
-              text: "Reload Discord",
-              onPress: props.reload
-            }),
-            /* @__PURE__ */ jsx(Button, {
-              style: {
-                flex: 1
-              },
-              text: "Retry Render",
-              onPress: props.rerender
-            })
-          ]
-        })
-      ]
-    });
-  }
-  function LabeledCard(props) {
-    var ViewComponent = props.scrollable ? ReactNative.ScrollView : ReactNative.View;
-    return /* @__PURE__ */ jsxs(Card, {
-      ...props,
-      style: [
-        styles.nestedView,
-        ...Array.isArray(props.style) ? props.style : [
-          props.style
-        ]
-      ],
-      children: [
-        /* @__PURE__ */ jsxs(ReactNative.View, {
-          style: {
-            flexDirection: "row",
-            alignItems: "center"
-          },
-          children: [
-            /* @__PURE__ */ jsx(Text, {
-              variant: "heading-xl/semibold",
-              style: styles.headerText,
-              children: props.label
-            }),
-            props.rawContent && /* @__PURE__ */ jsx(Button, {
-              variant: "secondary",
-              size: "sm",
-              text: "Copy",
-              onPress: () => clipboard.setString(props.rawContent)
-            })
-          ]
-        }),
-        /* @__PURE__ */ jsx(ViewComponent, {
-          style: styles.nestedView,
-          fadingEdgeLength: 32,
-          children: props.children
-        })
-      ]
-    });
-  }
-  function parseStackTrace(stackTrace) {
-    var frames = [];
-    var lines = stackTrace.split("\n");
-    for (var line of lines) {
-      var match = StackFrameRegex.exec(line.trim());
-      if (match) {
-        var at = void 0;
-        var path = void 0;
-        var ln = null;
-        var col = null;
-        if (match[3] && match[4]) {
-          at = match[1];
-          path = match[2];
-          ln = Number(match[3]);
-          col = Number(match[4]);
-        } else {
-          at = match[5];
-          path = match[6];
-        }
-        if (path === IndexBundleFilePath) path = "(Discord)";
-        frames.push({
-          at,
-          file: path,
-          line: ln,
-          column: col
-        });
-      } else {
-        frames.push({
-          at: "UNABLE TO PARSE LINE",
-          file: line,
-          line: null,
-          column: null
-        });
-      }
-    }
-    return frames;
-  }
-  var useErrorBoundaryStyles, styles, IndexBundleFilePath, StackFrameRegex;
-  var init_ErrorBoundaryScreen = __esm({
-    "libraries/app/src/components/ErrorBoundaryScreen.tsx"() {
-      "use strict";
-      init_react_jsx_runtime();
-      init_common();
-      init_components();
-      init_native();
-      init_colors();
-      init_errors();
-      useErrorBoundaryStyles = createStyles({
-        view: {
-          backgroundColor: SemanticColor.BG_BASE_SECONDARY,
-          paddingHorizontal: 16,
-          paddingVertical: 24,
-          flex: 1,
-          gap: 16
-        }
-      });
-      styles = ReactNative.StyleSheet.create({
-        nestedView: {
-          gap: 8,
-          flex: 1
-        },
-        headerText: {
-          flexGrow: 1
-        }
-      });
-      IndexBundleFilePath = HermesInternal.getFunctionLocation(__r).fileName;
-      StackFrameRegex = /at (.+) \(([^:]+):(\d+):(\d+)\)|at (.+)? \(([^)]+)\)/;
-    }
-  });
-
-  // libraries/app/src/index.tsx
-  var src_exports4 = {};
-  __export(src_exports4, {
-    AppLibrary: () => AppLibrary,
-    afterAppInitialized: () => afterAppInitialized,
-    afterAppRendered: () => afterAppRendered,
-    isAppInitialized: () => isAppInitialized,
-    isAppRendered: () => isAppRendered
-  });
-  function afterAppInitialized(callback) {
-    if (isAppInitialized) throw new Error("Cannot attach a callback after the app has already been initialized");
-    initializeCallbacks.add(callback);
-  }
-  function afterAppRendered(callback) {
-    if (isAppRendered) throw new Error("Cannot attach a callback after the App component has been rendered");
-    renderCallbacks.add(callback);
-  }
-  var patcher2, initializeCallbacks, renderCallbacks, isAppInitialized, isAppRendered, unpatchRunApplication, unpatchCreateElement, AppLibrary;
-  var init_src6 = __esm({
-    "libraries/app/src/index.tsx"() {
-      "use strict";
-      init_async_to_generator();
-      init_react_jsx_runtime();
-      init_src();
-      init_finders();
-      init_native();
-      init_src2();
-      init_src4();
-      patcher2 = createPatcherInstance("revenge.library.app");
-      initializeCallbacks = /* @__PURE__ */ new Set();
-      renderCallbacks = /* @__PURE__ */ new Set();
-      isAppInitialized = false;
-      isAppRendered = false;
-      afterAppInitialized(() => isAppInitialized = true);
-      afterAppRendered(() => isAppRendered = true);
-      unpatchRunApplication = patcher2.after(ReactNative.AppRegistry, "runApplication", () => {
-        unpatchRunApplication();
-        recordTimestamp("App_RunApplicationCalled");
-        for (var callback of initializeCallbacks) callback();
-        recordTimestamp("App_AfterRunCallbacks");
-      }, "runInitializeCallbacks");
-      unpatchCreateElement = patcher2.after(React, "createElement", () => {
-        unpatchCreateElement();
-        recordTimestamp("App_CreateElementCalled");
-        for (var callback of renderCallbacks) callback();
-      }, "runRenderCallbacks");
-      afterAppInitialized(/* @__PURE__ */ function() {
-        var _patchErrorBoundary = _async_to_generator(function* () {
-          var { settings: settings2 } = yield Promise.resolve().then(() => (init_src5(), src_exports3));
-          yield awaitStorage(settings2);
-          if (!settings2.developer.patchErrorBoundary) return;
-          var { default: Screen } = yield Promise.resolve().then(() => (init_ErrorBoundaryScreen(), ErrorBoundaryScreen_exports));
-          setImmediate(() => {
-            patcher2.after.await(findByName.async("ErrorBoundary").then((it) => it.prototype), "render", function() {
-              if (this.state.error) return /* @__PURE__ */ jsx(Screen, {
-                error: this.state.error,
-                rerender: () => this.setState({
-                  error: null,
-                  info: null
-                }),
-                reload: this.handleReload
-              });
-            }, "patchErrorBoundary");
-          });
-        });
-        function patchErrorBoundary() {
-          return _patchErrorBoundary.apply(this, arguments);
-        }
-        return patchErrorBoundary;
-      }());
-      AppLibrary = {
-        /**
-         * Whether the app has finished initializing
-         */
-        get initialized() {
-          return isAppInitialized;
-        },
-        /**
-         * Whether the App component has been rendered
-         */
-        get rendered() {
-          return isAppRendered;
-        },
-        /**
-         * Attaches a callback to be called when the app has been rendered
-         * @param callback The callback to be called
-         */
-        afterRendered: afterAppRendered,
-        /**
-         * Attaches a callback to be called when the app has been initialized
-         * @param callback The callback to be called
-         */
-        afterInitialized: afterAppInitialized,
-        /**
-         * Reloads the app
-         */
-        reload: () => BundleUpdaterManager.reload()
-      };
-    }
-  });
-
-  // libraries/assets/src/index.ts
-  var src_exports5 = {};
-  __export(src_exports5, {
-    AssetsLibrary: () => AssetsLibrary
-  });
-  function getAssetByName(name) {
-    return getAssetByIndex(cache.assets[name]);
-  }
-  function getAssetByIndex(index) {
-    return assets[index];
-  }
-  function getAssetIndexByName(name) {
-    var cachedId = cache.assets[name];
-    if (cachedId) return cachedId;
-    var moduleId = cache.assetModules[name];
-    if (!moduleId) return;
-    return cache.assets[name] = requireModule(moduleId);
-  }
-  var patcher3, assets, AssetsLibrary;
-  var init_src7 = __esm({
-    "libraries/assets/src/index.ts"() {
-      "use strict";
-      init_common();
-      init_metro();
-      init_src2();
-      patcher3 = createPatcherInstance("revenge.library.assets");
-      patcher3.after(assetsRegistry, "registerAsset", ([asset], index) => {
-        var moduleId = getImportingModuleId();
-        cacheAsset(asset.name, index, moduleId);
-      }, "patchRegisterAsset");
-      assets = new Proxy(Object.fromEntries(Object.entries(cache.assets).map(([key, index]) => [
-        key,
-        assetsRegistry.getAssetByID(index)
-      ])), {
-        get(cache2, prop) {
-          if (cache2[prop]) return cache2[prop];
-          return assetsRegistry.getAssetByID(Number(prop));
-        }
-      });
-      AssetsLibrary = {
-        assets,
-        getByName: getAssetByName,
-        getIndexByName: getAssetIndexByName,
-        getByIndex: getAssetByIndex
-      };
     }
   });
 
@@ -2932,6 +2945,16 @@
         Starting: 3,
         Started: 4
       };
+    }
+  });
+
+  // libraries/plugins/src/shared.ts
+  var logger3;
+  var init_shared2 = __esm({
+    "libraries/plugins/src/shared.ts"() {
+      "use strict";
+      init_common();
+      logger3 = new Logger("revenge.plugins");
     }
   });
 
@@ -2974,23 +2997,22 @@
       },
       start() {
         return _async_to_generator(function* () {
-          if (!this.enabled) throw new Error(`Plugin "${this.id}" must be enabled before starting`);
-          if (!this.stopped) throw new Error(`Plugin "${this.id}" is already started`);
-          prepareStorageAndPatcher();
-          this.status = PluginStatus.Starting;
-          var handleError = (e, stage) => {
+          var handleError = (e) => {
             this.errors.push(e);
             this.stop();
-            throw new Error(`Plugin "${this.id}" failed to start at "${stage}":
-${String(e)}`, {
-              cause: e
-            });
           };
-          if (isAppRendered && this.beforeAppRender) handleError(new Error(`Plugin "${this.id}" requires running before app is initialized`), "beforeAppRender");
+          if (!this.enabled) return handleError(new Error(`Plugin "${this.id}" must be enabled before starting`));
+          if (!this.stopped) return handleError(new Error(`Plugin "${this.id}" is already started`));
+          logger3.log(`Starting plugin: ${this.id}`);
+          this.status = PluginStatus.Starting;
+          prepareStorageAndPatcher();
+          if (isAppRendered && this.beforeAppRender) return handleError(new Error(`Plugin "${this.id}" requires running before app is initialized`));
           try {
             instance.context.beforeAppRender = yield this.beforeAppRender?.(instance);
           } catch (e) {
-            handleError(e, "onAppLaunched");
+            return handleError(new Error(`Plugin "${this.id}" encountered an error when running "beforeAppRender": ${e}`, {
+              cause: e
+            }));
           }
           var _this = this;
           if (this.afterAppRender) appRenderedCallbacks.add(/* @__PURE__ */ _async_to_generator(function* () {
@@ -2999,7 +3021,9 @@ ${String(e)}`, {
               instance.context.afterAppRender = yield _this.afterAppRender(instance);
               _this.status = PluginStatus.Started;
             } catch (e) {
-              handleError(e, "onAppInitialized");
+              return handleError(new Error(`Plugin "${_this.id}" encountered an error when running "afterAppRender": ${e}`, {
+                cause: e
+              }));
             }
           }));
           else this.status = PluginStatus.Started;
@@ -3007,15 +3031,22 @@ ${String(e)}`, {
       },
       stop() {
         if (this.stopped) return;
+        logger3.log(`Stopping plugin: ${this.id}`);
         try {
           this.beforeStop?.(instance);
         } catch (e) {
-          this.errors.push(new Error(`Plugin "${this.id}" failed to stop`, {
+          this.errors.push(new Error(`Plugin "${this.id}" encountered an error when stopping: ${e}`, {
             cause: e
           }));
-        } finally {
-          for (var cleanup of cleanups) cleanup();
-          if (!instance.patcher.destroyed) instance.patcher.destroy();
+        }
+        for (var cleanup of cleanups) cleanup();
+        if (!instance.patcher.destroyed) instance.patcher.destroy();
+        this.status = PluginStatus.Stopped;
+        if (this.errors.length) {
+          var msg = `Plugin "${this.id}" encountered ${this.errors.length} errors
+${this.errors.map(getErrorStack).join("\n")}`;
+          logger3.error(msg);
+          throw new AggregateError(this.errors, msg);
         }
       }
     });
@@ -3060,13 +3091,15 @@ ${String(e)}`, {
     "libraries/plugins/src/internals.ts"() {
       "use strict";
       init_async_to_generator();
-      init_src6();
+      init_src4();
       init_metro();
       init_src2();
-      init_src4();
+      init_src6();
+      init_errors();
       init_functions();
       init_lazy();
       init_constants2();
+      init_shared2();
       appRenderedCallbacks = /* @__PURE__ */ new Set();
       corePluginIds = /* @__PURE__ */ new Set();
       plugins = /* @__PURE__ */ new Map();
@@ -3080,41 +3113,37 @@ ${String(e)}`, {
     PluginsLibrary: () => PluginsLibrary,
     definePlugin: () => definePlugin,
     startCorePlugins: () => startCorePlugins,
-    startCorePluginsMetroModuleSubscriptions: () => startCorePluginsMetroModuleSubscriptions
+    startPluginsMetroModuleSubscriptions: () => startPluginsMetroModuleSubscriptions
   });
   function definePlugin(definition) {
     return registerPlugin(definition);
   }
   function startCorePlugins() {
-    return _startCorePlugins.apply(this, arguments);
-  }
-  function _startCorePlugins() {
-    _startCorePlugins = _async_to_generator(function* () {
-      var promises = [];
-      for (var id of corePluginIds) {
-        try {
-          var plugin = plugins.get(id);
-          if (plugin.enabled) promises.push(plugin.start());
-        } catch (e) {
-          throw new Error(`Core plugin "${id}" had an error while starting`, {
-            cause: e
-          });
-        }
-      }
-      return void (yield Promise.all(promises));
+    logger3.info("Starting core plugins lifecycles...");
+    var promises = [];
+    var errors = [];
+    for (var id of corePluginIds) {
+      var plugin2 = plugins.get(id);
+      if (!plugin2.enabled) continue;
+      promises.push(plugin2.start().catch((e) => errors.push(e)));
+    }
+    return new Promise((resolve, reject) => {
+      Promise.all(promises).then(() => errors.length ? reject(new AggregateError(errors, `${errors.length} core plugins encountered errors:
+${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
     });
-    return _startCorePlugins.apply(this, arguments);
   }
-  function startCorePluginsMetroModuleSubscriptions() {
-    for (var plugin of plugins.values()) plugin.startMetroModuleSubscriptions();
+  function startPluginsMetroModuleSubscriptions() {
+    logger3.info("Starting Metro module subscriptions for plugins...");
+    for (var plugin2 of plugins.values()) plugin2.startMetroModuleSubscriptions();
   }
   var PluginsLibrary;
   var init_src8 = __esm({
     "libraries/plugins/src/index.ts"() {
       "use strict";
-      init_async_to_generator();
-      init_src6();
+      init_src4();
+      init_errors();
       init_internals();
+      init_shared2();
       afterAppRendered(() => {
         for (var cb of appRenderedCallbacks) cb();
       });
@@ -3126,58 +3155,6 @@ ${String(e)}`, {
          */
         definePlugin
       };
-    }
-  });
-
-  // src/plugins/warnings/index.ts
-  var MinimumSupportedBuildNumber;
-  var init_warnings = __esm({
-    "src/plugins/warnings/index.ts"() {
-      "use strict";
-      init_common();
-      init_native();
-      init_internals();
-      MinimumSupportedBuildNumber = ReactNative3.Platform.select({
-        android: 254e3,
-        ios: 65235
-      });
-      registerPlugin(
-        {
-          name: "Warnings",
-          author: "The Revenge Team",
-          description: "Startup warnings for users that are not using the recommended defaults for Revenge",
-          id: "revenge.warnings",
-          version: "1.0.0",
-          icon: "WarningIcon",
-          afterAppRender({ revenge: { assets: assets3, modules: modules2 }, storage }) {
-            var { legacy_alerts: legacy_alerts2, toasts: toasts2 } = modules2.common;
-            if ((storage.supportWarningDismissedAt ?? Date.now()) + 6048e5 > Date.now()) {
-              legacy_alerts2.show({
-                title: "Support Warning",
-                body: (
-                  // biome-ignore lint/style/useTemplate: I can't see the whole message when not doing concatenation
-                  `Revenge does not officially support this build of Discord. Please update to a newer version as some features may not work as expected.
-
-Supported Builds: 250.0 (${MinimumSupportedBuildNumber}) or after
-Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
-                ),
-                confirmText: "Remind me in 7 days",
-                onConfirm: () => {
-                  storage.supportWarningDismissedAt = Date.now();
-                  toasts2.open({
-                    key: "revenge.toasts.warnings.support-warning.dismissed",
-                    content: "You will see this warning again in 7 days",
-                    icon: assets3.getIndexByName("ic_warning_24px")
-                  });
-                }
-              });
-            }
-          }
-        },
-        true,
-        // We do !> instead of < in case the value of the left is NaN
-        () => !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber)
-      );
     }
   });
 
@@ -3251,71 +3228,87 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     }
   });
 
+  // src/plugins/settings/pages/(Wrapper).tsx
+  function PageWrapper(props) {
+    return /* @__PURE__ */ jsx(ReactNative.ScrollView, {
+      keyboardShouldPersistTaps: "handled",
+      children: props.children
+    });
+  }
+  var init_Wrapper = __esm({
+    "src/plugins/settings/pages/(Wrapper).tsx"() {
+      "use strict";
+      init_react_jsx_runtime();
+    }
+  });
+
   // src/plugins/settings/pages/About.tsx
   function AboutSettingsPage() {
     var runtimeProps = HermesInternal.getRuntimeProperties();
-    return /* @__PURE__ */ jsxs(Stack, {
-      style: {
-        paddingHorizontal: 16,
-        paddingVertical: 24
-      },
-      spacing: 16,
-      direction: "vertical",
-      children: [
-        /* @__PURE__ */ jsx(TableRowGroup, {
-          title: "App",
-          children: [
-            {
-              label: "Revenge",
-              icon: {
-                uri: revenge_default
+    return /* @__PURE__ */ jsx(PageWrapper, {
+      children: /* @__PURE__ */ jsxs(Stack, {
+        style: {
+          paddingHorizontal: 16,
+          paddingVertical: 24
+        },
+        spacing: 16,
+        direction: "vertical",
+        children: [
+          /* @__PURE__ */ jsx(TableRowGroup, {
+            title: "App",
+            children: [
+              {
+                label: "Revenge",
+                icon: {
+                  uri: revenge_default
+                },
+                trailing: `${"local"} (${"dba5438"}${false ? "-dirty" : ""})`
               },
-              trailing: "local"
-            },
-            {
-              label: "Discord",
-              icon: assets2.getIndexByName("Discord"),
-              trailing: `${ClientInfoModule.Version} (${ClientInfoModule.Build})`
-            }
-          ].map((props) => (
-            // biome-ignore lint/correctness/useJsxKeyInIterable: This page never gets updated
-            /* @__PURE__ */ jsx(VersionRow, {
-              ...props
-            })
-          ))
-        }),
-        /* @__PURE__ */ jsx(TableRowGroup, {
-          title: "React",
-          children: [
-            {
-              label: "React",
-              icon: {
-                uri: react_default2
+              {
+                label: "Discord",
+                icon: assets2.getIndexByName("Discord"),
+                trailing: `${ClientInfoModule.Version} (${ClientInfoModule.Build})`
+              }
+            ].map((props) => (
+              // biome-ignore lint/correctness/useJsxKeyInIterable: This page never gets updated
+              /* @__PURE__ */ jsx(VersionRow, {
+                ...props
+              })
+            ))
+          }),
+          /* @__PURE__ */ jsx(TableRowGroup, {
+            title: "React",
+            children: [
+              {
+                label: "React",
+                icon: {
+                  uri: react_default2
+                },
+                trailing: React.version
               },
-              trailing: React.version
-            },
-            {
-              label: "React Native",
-              icon: {
-                uri: react_default2
+              {
+                label: "React Native",
+                icon: {
+                  uri: react_default2
+                },
+                trailing: runtimeProps["OSS Release Version"].slice(7)
               },
-              trailing: runtimeProps["OSS Release Version"].slice(7)
-            },
-            {
-              label: "Hermes Bytecode",
-              icon: {
-                uri: hermes_default
-              },
-              trailing: `${runtimeProps["Bytecode Version"]} (${runtimeProps.Build})`
-            }
-          ].map((props) => (
-            // biome-ignore lint/correctness/useJsxKeyInIterable: This page never gets updated
-            /* @__PURE__ */ jsx(VersionRow, {
-              ...props
-            })
-          ))
-        })
-      ]
+              {
+                label: "Hermes Bytecode",
+                icon: {
+                  uri: hermes_default
+                },
+                trailing: `${runtimeProps["Bytecode Version"]} (${runtimeProps.Build})`
+              }
+            ].map((props) => (
+              // biome-ignore lint/correctness/useJsxKeyInIterable: This page never gets updated
+              /* @__PURE__ */ jsx(VersionRow, {
+                ...props
+              })
+            ))
+          })
+        ]
+      })
     });
   }
   function VersionRow(props) {
@@ -3348,6 +3341,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_hermes();
       init_react3();
       init_revenge();
+      init_Wrapper();
       ({ assets: assets2 } = revenge);
     }
   });
@@ -3370,179 +3364,6 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     }
   });
 
-  // src/plugins/settings/pages/DebugPerformanceTimes.tsx
-  function DebugPerformanceTimesSettingsPage() {
-    var previousTimestamp;
-    return /* @__PURE__ */ jsxs(Fragment, {
-      children: [
-        /* @__PURE__ */ jsx(Text, {
-          color: "text-danger",
-          children: "Some delta times may be inaccurate as some steps run concurrently to each other. Only look at delta times when necessary. Steps that are marked in red were skipped/not recorded."
-        }),
-        PerformanceTimesKeys.map((key) => {
-          var timeNumber = timeOf(key);
-          previousTimestamp ??= timestampOf(key);
-          var time = timeNumber.toFixed(4);
-          var delta = (timestampOf(key) - previousTimestamp).toFixed(4);
-          if (!Number.isNaN(timeNumber)) previousTimestamp = timestampOf(key);
-          return (
-            // biome-ignore lint/correctness/useJsxKeyInIterable: This never gets rerendered
-            /* @__PURE__ */ jsx(TableRow, {
-              variant: Number.isNaN(timeNumber) ? "danger" : "default",
-              label: key,
-              subLabel: `${time}ms (\u0394: ${delta}ms)`
-            })
-          );
-        })
-      ]
-    });
-  }
-  var PerformanceTimesKeys;
-  var init_DebugPerformanceTimes = __esm({
-    "src/plugins/settings/pages/DebugPerformanceTimes.tsx"() {
-      "use strict";
-      init_react_jsx_runtime();
-      init_src();
-      init_components();
-      PerformanceTimesKeys = Object.keys(PerformanceTimes).sort((a, b3) => timeOf(a) - timeOf(b3));
-    }
-  });
-
-  // src/plugins/settings/pages/Developer.tsx
-  function DeveloperSettingsPage() {
-    var { assets: assets3, modules: modules2 } = revenge;
-    var navigation = NavigationNative.useNavigation();
-    var evalCodeRef = React.useRef("");
-    useObservable([
-      settings
-    ]);
-    return /* @__PURE__ */ jsxs(Stack, {
-      style: {
-        paddingHorizontal: 16,
-        paddingVertical: 24
-      },
-      spacing: 16,
-      direction: "vertical",
-      children: [
-        /* @__PURE__ */ jsxs(TableRowGroup, {
-          children: [
-            /* @__PURE__ */ jsx(TableSwitchRow, {
-              label: "Patch ErrorBoundary",
-              subLabel: "Allows you to see a more detailed error screen, but may slow down the app during startup.",
-              icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                source: assets3.getIndexByName("ScreenXIcon")
-              }),
-              value: settings.developer.patchErrorBoundary,
-              onValueChange: (v2) => settings.developer.patchErrorBoundary = v2
-            }),
-            /* @__PURE__ */ jsx(TableRow, {
-              label: "Evaluate JavaScript",
-              icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                source: assets3.getIndexByName("PaperIcon")
-              }),
-              onPress: () => {
-                alerts.openAlert("revenge.plugins.settings.developer.evaluate", /* @__PURE__ */ jsx(AlertModal, {
-                  title: "Evaluate JavaScript",
-                  extraContent: /* @__PURE__ */ jsx(TextArea, {
-                    autoFocus: true,
-                    label: "Code",
-                    size: "md",
-                    placeholder: "ReactNative.NativeModules.BundleUpdaterManager.reload()",
-                    onChange: (v2) => evalCodeRef.current = v2
-                  }),
-                  actions: /* @__PURE__ */ jsxs(Stack, {
-                    children: [
-                      /* @__PURE__ */ jsx(AlertActionButton, {
-                        text: "Evaluate",
-                        variant: "primary",
-                        onPress: () => alert(modules2.findProp("inspect")(
-                          // biome-ignore lint/security/noGlobalEval: This is intentional
-                          globalThis.eval(evalCodeRef.current),
-                          {
-                            depth: 5
-                          }
-                        ))
-                      }),
-                      /* @__PURE__ */ jsx(AlertActionButton, {
-                        text: "Cancel",
-                        variant: "secondary"
-                      })
-                    ]
-                  })
-                }));
-              }
-            })
-          ]
-        }),
-        /* @__PURE__ */ jsxs(TableRowGroup, {
-          title: "Tests",
-          children: [
-            /* @__PURE__ */ jsx(TableRow, {
-              label: "Test CustomPageRenderer",
-              icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                source: assets3.getIndexByName("ScreenArrowIcon")
-              }),
-              onPress: () => navigation.navigate("RevengeCustomPage", {
-                title: "Custom Page Test",
-                render: () => null
-              })
-            }),
-            /* @__PURE__ */ jsx(TableRow, {
-              variant: "danger",
-              label: "Test ErrorBoundary",
-              icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                variant: "danger",
-                source: assets3.getIndexByName("ScreenXIcon")
-              }),
-              onPress: () => navigation.navigate("RevengeCustomPage", {
-                title: "ErrorBoundary Test",
-                // @ts-expect-error: This will do it
-                render: () => /* @__PURE__ */ jsx("undefined", {})
-              })
-            })
-          ]
-        }),
-        /* @__PURE__ */ jsx(TableRowGroup, {
-          title: "Performance",
-          children: /* @__PURE__ */ jsx(TableRow, {
-            label: "Show Debug Performance Times",
-            icon: /* @__PURE__ */ jsx(TableRowIcon, {
-              source: assets3.getIndexByName("TimerIcon")
-            }),
-            onPress: () => navigation.navigate("RevengeDebugPerformanceTimes")
-          })
-        }),
-        /* @__PURE__ */ jsx(TableRowGroup, {
-          title: "Caches",
-          children: /* @__PURE__ */ jsx(TableRow, {
-            variant: "danger",
-            label: "Recreate Metro Cache",
-            subLabel: "Module blacklists, lookup flags, asset index maps, asset module ID maps. This will reload the app.",
-            icon: /* @__PURE__ */ jsx(TableRowIcon, {
-              variant: "danger",
-              source: assets3.getIndexByName("TrashIcon")
-            }),
-            onPress: () => {
-              modules2.metro.invalidateCache();
-              BundleUpdaterManager.reload();
-            }
-          })
-        })
-      ]
-    });
-  }
-  var init_Developer = __esm({
-    "src/plugins/settings/pages/Developer.tsx"() {
-      "use strict";
-      init_react_jsx_runtime();
-      init_common();
-      init_components();
-      init_native();
-      init_src5();
-      init_src4();
-    }
-  });
-
   // src/plugins/settings/pages/Revenge.tsx
   function RevengeSettingsPage() {
     var { assets: assets3 } = revenge;
@@ -3550,54 +3371,48 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     useObservable([
       settings
     ]);
-    return /* @__PURE__ */ jsxs(Stack, {
-      style: {
-        paddingHorizontal: 16,
-        paddingVertical: 24
-      },
-      spacing: 16,
-      direction: "vertical",
-      children: [
-        /* @__PURE__ */ jsx(TableRowGroup, {
-          title: "Info",
-          children: /* @__PURE__ */ jsx(TableRow, {
-            label: "About",
-            icon: /* @__PURE__ */ jsx(TableRowIcon, {
-              source: assets3.getIndexByName("CircleInformationIcon")
-            }),
-            trailing: /* @__PURE__ */ jsx(TableRow.Arrow, {}),
-            onPress: () => navigation.push("RevengeAbout")
-          })
-        }),
-        /* @__PURE__ */ jsx(TableRowGroup, {
-          title: "Actions",
-          children: /* @__PURE__ */ jsx(TableRow, {
-            label: "Reload Discord",
-            icon: /* @__PURE__ */ jsx(TableRowIcon, {
-              source: assets3.getIndexByName("RetryIcon")
-            }),
-            // Passing BundleUpdaterManager.reload directly just explodes for some reason. Maybe onPress had args?
-            onPress: () => BundleUpdaterManager.reload()
-          })
-        }),
-        /* @__PURE__ */ jsxs(TableRowGroup, {
-          title: "Advanced",
-          children: [
-            /* @__PURE__ */ jsx(TableSwitchRow, {
-              label: "Show Developer Options",
+    return /* @__PURE__ */ jsx(PageWrapper, {
+      children: /* @__PURE__ */ jsxs(Stack, {
+        style: {
+          paddingHorizontal: 16,
+          paddingVertical: 24
+        },
+        spacing: 16,
+        direction: "vertical",
+        children: [
+          /* @__PURE__ */ jsx(TableRowGroup, {
+            title: "Info",
+            children: /* @__PURE__ */ jsx(TableRow, {
+              label: "About",
               icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                source: assets3.getIndexByName("WrenchIcon")
+                source: assets3.getIndexByName("CircleInformationIcon")
               }),
-              value: settings.developer.settingsPageShown,
-              onValueChange: (v2) => settings.developer.settingsPageShown = v2
-            }),
-            ...rows.map((Row, index) => /* @__PURE__ */ jsx(Row, {}, index.toString()))
-          ]
-        })
-      ]
+              trailing: /* @__PURE__ */ jsx(TableRow.Arrow, {}),
+              onPress: () => navigation.push("RevengeAbout")
+            })
+          }),
+          /* @__PURE__ */ jsx(TableRowGroup, {
+            title: "Actions",
+            children: /* @__PURE__ */ jsx(TableRow, {
+              label: "Reload Discord",
+              icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                source: assets3.getIndexByName("RetryIcon")
+              }),
+              // Passing BundleUpdaterManager.reload directly just explodes for some reason. Maybe onPress had args?
+              onPress: () => BundleUpdaterManager.reload()
+            })
+          }),
+          /* @__PURE__ */ jsx(TableRowGroup, {
+            title: "Advanced",
+            children: [
+              ...rows.map((Row, index) => /* @__PURE__ */ jsx(Row, {}, index.toString()))
+            ]
+          })
+        ]
+      })
     });
   }
-  function internal_addTableRowsToAdvancedSectionInRevengePage(...comps) {
+  function addTableRowsToAdvancedSectionInRevengePage(...comps) {
     rows.push(...comps);
   }
   var rows;
@@ -3608,27 +3423,27 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_common();
       init_components();
       init_native();
-      init_src5();
-      init_src4();
+      init_src7();
+      init_src6();
+      init_Wrapper();
       rows = [];
     }
   });
 
-  // src/plugins/settings/index.tsx
+  // src/plugins/settings/index.ts
   var getCustomRows, transformRowToRawRow;
   var init_settings2 = __esm({
-    "src/plugins/settings/index.tsx"() {
+    "src/plugins/settings/index.ts"() {
       "use strict";
+      init_async_to_generator();
       init_components();
       init_internals();
+      init_functions();
       init_react2();
       init_settings();
-      init_src5();
       init_revenge();
       init_About();
       init_CustomPageRenderer();
-      init_DebugPerformanceTimes();
-      init_Developer();
       init_Revenge();
       registerPlugin({
         name: "Settings",
@@ -3638,7 +3453,34 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.0",
         icon: "SettingsIcon",
         afterAppRender({ patcher: patcher5, revenge: { assets: assets3, modules: modules2, ui: { settings: sui } } }) {
-          setTimeout(() => {
+          return _async_to_generator(function* () {
+            sui.createSection({
+              name: "Revenge",
+              settings: {
+                Revenge: {
+                  type: "route",
+                  label: "Revenge",
+                  icon: {
+                    uri: revenge_default
+                  },
+                  component: RevengeSettingsPage
+                }
+              }
+            });
+            sui.createRoute("RevengeAbout", {
+              type: "route",
+              label: "About",
+              component: AboutSettingsPage,
+              icon: assets3.getIndexByName("CircleInformationIcon")
+            });
+            sui.createRoute("RevengeCustomPage", {
+              type: "route",
+              label: "Revenge Page",
+              unsearchable: true,
+              component: CustomPageRenderer,
+              predicate: () => false
+            });
+            yield sleep(0);
             var SettingsConstants = modules2.findByProps("SETTING_RENDERER_CONFIG");
             var SettingsOverviewScreen = modules2.findByName("SettingsOverviewScreen", false);
             var originalRendererConfig = SettingsConstants.SETTING_RENDERER_CONFIG;
@@ -3665,46 +3507,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                 });
               }
             }, "addNewSettingsSections");
-            sui.createSection({
-              name: "Revenge",
-              settings: {
-                Revenge: {
-                  type: "route",
-                  label: "Revenge",
-                  icon: {
-                    uri: revenge_default
-                  },
-                  component: RevengeSettingsPage
-                },
-                RevengeDeveloper: {
-                  type: "route",
-                  label: "Developer",
-                  icon: assets3.getIndexByName("WrenchIcon"),
-                  component: DeveloperSettingsPage,
-                  predicate: () => settings.developer.settingsPageShown
-                }
-              }
-            });
-            sui.createRoute("RevengeAbout", {
-              type: "route",
-              label: "About",
-              component: AboutSettingsPage,
-              icon: assets3.getIndexByName("CircleInformationIcon")
-            });
-            sui.createRoute("RevengeDebugPerformanceTimes", {
-              type: "route",
-              label: "Debug Performance Times",
-              component: DebugPerformanceTimesSettingsPage,
-              icon: assets3.getIndexByName("TimerIcon")
-            });
-            sui.createRoute("RevengeCustomPage", {
-              type: "route",
-              label: "Revenge Page",
-              unsearchable: true,
-              component: CustomPageRenderer,
-              predicate: () => false
-            });
-          });
+          })();
         }
       }, true);
       getCustomRows = () => {
@@ -3753,7 +3556,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_react_jsx_runtime();
       init_components();
       init_internals();
-      init_src4();
+      init_src6();
       init_Revenge();
       isStaffSettingsShown = () => true;
       registerPlugin({
@@ -3780,7 +3583,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         beforeAppRender({ cleanup, storage, revenge: { assets: assets3 } }) {
           cleanup(() => isStaffSettingsShown = () => originalValue);
           isStaffSettingsShown = () => storage[storageContextSymbol].ready ? storage.enabled : true;
-          internal_addTableRowsToAdvancedSectionInRevengePage(() => {
+          addTableRowsToAdvancedSectionInRevengePage(() => {
             useObservable([
               storage
             ]);
@@ -3801,14 +3604,445 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     }
   });
 
+  // src/plugins/developer-settings/pages/DebugPerformanceTimes.tsx
+  function DebugPerformanceTimesSettingsPage() {
+    var previousTimestamp;
+    return /* @__PURE__ */ jsxs(PageWrapper, {
+      children: [
+        /* @__PURE__ */ jsx(Text, {
+          color: "text-danger",
+          children: "Some delta times may be inaccurate as some steps run concurrently to each other. Only look at delta times when necessary. Steps that are marked in red were skipped/not recorded."
+        }),
+        PerformanceTimesKeys.map((key) => {
+          var timeNumber = timeOf(key);
+          previousTimestamp ??= timestampOf(key);
+          var time = timeNumber.toFixed(4);
+          var delta = (timestampOf(key) - previousTimestamp).toFixed(4);
+          if (!Number.isNaN(timeNumber)) previousTimestamp = timestampOf(key);
+          return (
+            // biome-ignore lint/correctness/useJsxKeyInIterable: This never gets rerendered
+            /* @__PURE__ */ jsx(TableRow, {
+              variant: Number.isNaN(timeNumber) ? "danger" : "default",
+              label: key,
+              subLabel: `${time}ms (\u0394: ${delta}ms)`
+            })
+          );
+        })
+      ]
+    });
+  }
+  var PerformanceTimesKeys;
+  var init_DebugPerformanceTimes = __esm({
+    "src/plugins/developer-settings/pages/DebugPerformanceTimes.tsx"() {
+      "use strict";
+      init_react_jsx_runtime();
+      init_src();
+      init_components();
+      init_Wrapper();
+      PerformanceTimesKeys = Object.keys(PerformanceTimes).sort((a, b3) => timeOf(a) - timeOf(b3));
+    }
+  });
+
+  // src/plugins/developer-settings/devtools.ts
+  function disconnectFromDevTools() {
+    DevToolsContext.ws.close();
+    DevToolsContext.connected = false;
+  }
+  function connectToDevTools(addr) {
+    var ws = DevToolsContext.ws = new WebSocket(`ws://${addr}`);
+    ws.addEventListener("open", () => {
+      DevToolsContext.connected = true;
+      DevToolsEvents.emit("connect");
+      DevToolsEvents.emit("*", "connect");
+    });
+    ws.addEventListener("close", () => {
+      DevToolsContext.connected = false;
+      DevToolsEvents.emit("disconnect");
+      DevToolsEvents.emit("*", "disconnect");
+    });
+    ws.addEventListener("error", (e) => {
+      DevToolsContext.connected = false;
+      DevToolsEvents.emit("error", e);
+      DevToolsEvents.emit("*", "error", e);
+    });
+    __reactDevTools.exports.connectToDevTools({
+      websocket: ws
+    });
+  }
+  var DevToolsEvents, DevToolsContext;
+  var init_devtools = __esm({
+    "src/plugins/developer-settings/devtools.ts"() {
+      "use strict";
+      init_events();
+      DevToolsEvents = new EventEmitter();
+      DevToolsContext = {
+        ws: void 0,
+        connected: false,
+        error: void 0
+      };
+    }
+  });
+
+  // src/plugins/developer-settings/pages/Developer.tsx
+  function DeveloperSettingsPage() {
+    var { storage, revenge: { assets: assets3, modules: modules2 } } = React.useContext(PluginContext);
+    useObservable([
+      storage
+    ]);
+    var navigation = NavigationNative.useNavigation();
+    var refEvalCode = React.useRef("");
+    var refDevToolsAddr = React.useRef(storage.reactDevTools.address || "localhost:8097");
+    var [connected, setConnected] = React.useState(DevToolsContext.connected);
+    React.useEffect(() => {
+      var listener = (evt) => {
+        if (evt === "connect") setConnected(true);
+        else setConnected(false);
+      };
+      DevToolsEvents.on("*", listener);
+      return () => void DevToolsEvents.off("*", listener);
+    }, []);
+    return /* @__PURE__ */ jsx(PageWrapper, {
+      children: /* @__PURE__ */ jsxs(Stack, {
+        style: {
+          paddingHorizontal: 16,
+          paddingVertical: 24
+        },
+        spacing: 16,
+        direction: "vertical",
+        children: [
+          typeof __reactDevTools !== "undefined" && /* @__PURE__ */ jsxs(Stack, {
+            spacing: 8,
+            direction: "vertical",
+            children: [
+              /* @__PURE__ */ jsx(TextInput, {
+                editable: !connected,
+                isDisabled: connected,
+                leadingText: "ws://",
+                defaultValue: refDevToolsAddr.current,
+                label: "React DevTools",
+                onChange: (text) => refDevToolsAddr.current = text,
+                onBlur: () => {
+                  if (refDevToolsAddr.current === storage.reactDevTools.address) return;
+                  storage.reactDevTools.address = refDevToolsAddr.current;
+                  toasts.open({
+                    key: "revenge.plugins.settings.react-devtools.saved",
+                    content: "Saved DevTools address!"
+                  });
+                },
+                returnKeyType: "done"
+              }),
+              /* @__PURE__ */ jsxs(TableRowGroup, {
+                children: [
+                  connected ? /* @__PURE__ */ jsx(TableRow, {
+                    label: "Disconnect from React DevTools",
+                    variant: "danger",
+                    icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                      variant: "danger",
+                      source: {
+                        uri: react_default2
+                      }
+                    }),
+                    onPress: () => disconnectFromDevTools()
+                  }) : /* @__PURE__ */ jsx(TableRow, {
+                    label: "Connect to React DevTools",
+                    icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                      source: {
+                        uri: react_default2
+                      }
+                    }),
+                    onPress: () => connectToDevTools(refDevToolsAddr.current)
+                  }),
+                  /* @__PURE__ */ jsx(TableSwitchRow, {
+                    label: "Auto Connect on Startup",
+                    subLabel: "Automatically connect to React DevTools when the app starts.",
+                    icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                      source: {
+                        uri: react_default2
+                      }
+                    }),
+                    value: storage.reactDevTools.autoConnect,
+                    onValueChange: (v2) => storage.reactDevTools.autoConnect = v2
+                  })
+                ]
+              })
+            ]
+          }),
+          /* @__PURE__ */ jsxs(TableRowGroup, {
+            title: "Tools",
+            children: [
+              /* @__PURE__ */ jsx(TableRow, {
+                label: "Evaluate JavaScript",
+                icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                  source: assets3.getIndexByName("PaperIcon")
+                }),
+                onPress: () => {
+                  alerts.openAlert("revenge.plugins.storage.evaluate", /* @__PURE__ */ jsx(AlertModal, {
+                    title: "Evaluate JavaScript",
+                    extraContent: /* @__PURE__ */ jsx(TextArea, {
+                      autoFocus: true,
+                      label: "Code",
+                      size: "md",
+                      placeholder: "ReactNative.NativeModules.BundleUpdaterManager.reload()",
+                      onChange: (v2) => refEvalCode.current = v2
+                    }),
+                    actions: /* @__PURE__ */ jsxs(Stack, {
+                      children: [
+                        /* @__PURE__ */ jsx(AlertActionButton, {
+                          text: "Evaluate",
+                          variant: "primary",
+                          onPress: () => alert(modules2.findProp("inspect")(
+                            // biome-ignore lint/security/noGlobalEval: This is intentional
+                            globalThis.eval(refEvalCode.current),
+                            {
+                              depth: 5
+                            }
+                          ))
+                        }),
+                        /* @__PURE__ */ jsx(AlertActionButton, {
+                          text: "Cancel",
+                          variant: "secondary"
+                        })
+                      ]
+                    })
+                  }));
+                }
+              }),
+              /* @__PURE__ */ jsx(TableRow, {
+                variant: "danger",
+                label: "Clear Settings",
+                subLabel: "This will remove the settings file and reload the app.",
+                icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                  variant: "danger",
+                  source: assets3.getIndexByName("TrashIcon")
+                }),
+                onPress: /* @__PURE__ */ _async_to_generator(function* () {
+                  yield settings[storageContextSymbol].file.delete();
+                  BundleUpdaterManager.reload();
+                })
+              })
+            ]
+          }),
+          /* @__PURE__ */ jsxs(TableRowGroup, {
+            title: "Tests",
+            children: [
+              /* @__PURE__ */ jsx(TableRow, {
+                label: "Test CustomPageRenderer",
+                icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                  source: assets3.getIndexByName("ScreenArrowIcon")
+                }),
+                onPress: () => navigation.navigate("RevengeCustomPage", {
+                  title: "Custom Page Test",
+                  render: () => null
+                })
+              }),
+              /* @__PURE__ */ jsx(TableRow, {
+                variant: "danger",
+                label: "Test ErrorBoundary",
+                icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                  variant: "danger",
+                  source: assets3.getIndexByName("ScreenXIcon")
+                }),
+                onPress: () => navigation.navigate("RevengeCustomPage", {
+                  title: "ErrorBoundary Test",
+                  // @ts-expect-error: This will do it
+                  render: () => /* @__PURE__ */ jsx("undefined", {})
+                })
+              })
+            ]
+          }),
+          /* @__PURE__ */ jsx(TableRowGroup, {
+            title: "Performance",
+            children: /* @__PURE__ */ jsx(TableRow, {
+              label: "Show Debug Performance Times",
+              icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                source: assets3.getIndexByName("TimerIcon")
+              }),
+              onPress: () => navigation.navigate("RevengeDebugPerformanceTimes")
+            })
+          }),
+          /* @__PURE__ */ jsx(TableRowGroup, {
+            title: "Caches",
+            children: /* @__PURE__ */ jsx(TableRow, {
+              variant: "danger",
+              label: "Recreate Metro Cache",
+              subLabel: "Module blacklists, lookup flags, asset index maps, asset module ID maps. This will reload the app.",
+              icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                variant: "danger",
+                source: assets3.getIndexByName("TrashIcon")
+              }),
+              onPress: () => {
+                modules2.metro.invalidateCache();
+                BundleUpdaterManager.reload();
+              }
+            })
+          })
+        ]
+      })
+    });
+  }
+  var init_Developer = __esm({
+    "src/plugins/developer-settings/pages/Developer.tsx"() {
+      "use strict";
+      init_async_to_generator();
+      init_react_jsx_runtime();
+      init_common();
+      init_components();
+      init_native();
+      init_src6();
+      init_Wrapper();
+      init_devtools();
+      init_react3();
+      init_src7();
+      init_developer_settings();
+    }
+  });
+
+  // src/plugins/developer-settings/index.tsx
+  var plugin, PluginContext;
+  var init_developer_settings = __esm({
+    "src/plugins/developer-settings/index.tsx"() {
+      "use strict";
+      init_async_to_generator();
+      init_react_jsx_runtime();
+      init_common();
+      init_components();
+      init_internals();
+      init_Revenge();
+      init_DebugPerformanceTimes();
+      init_Developer();
+      init_devtools();
+      init_src6();
+      init_functions();
+      plugin = registerPlugin({
+        name: "Developer Settings",
+        author: "The Revenge Team",
+        description: "Developer settings for Revenge",
+        id: "revenge.developer-settings",
+        version: "1.0.0",
+        icon: "WrenchIcon",
+        afterAppRender(context) {
+          return _async_to_generator(function* () {
+            var { storage, revenge: { assets: assets3, ui: { settings: sui } } } = context;
+            function wrapPluginContext(Component) {
+              return () => /* @__PURE__ */ jsx(PluginContext.Provider, {
+                value: context,
+                children: /* @__PURE__ */ jsx(Component, {})
+              });
+            }
+            DevToolsEvents.on("error", (err) => toasts.open({
+              key: "revenge.plugins.settings.react-devtools.error",
+              content: `Error while connecting to React DevTools:
+${err.message}`
+            }));
+            DevToolsEvents.on("connect", () => toasts.open({
+              key: "revenge.plugins.settings.react-devtools.connected",
+              content: "Connected to React DevTools"
+            }));
+            if (storage.reactDevTools.autoConnect && globalThis.__reactDevTools) connectToDevTools(storage.reactDevTools.address);
+            yield sleep(0);
+            sui.addRowsToSection("Revenge", {
+              RevengeDeveloper: {
+                type: "route",
+                label: "Developer",
+                icon: assets3.getIndexByName("WrenchIcon"),
+                component: wrapPluginContext(DeveloperSettingsPage),
+                predicate: () => storage.settingsRowShown
+              }
+            });
+            sui.createRoute("RevengeDebugPerformanceTimes", {
+              type: "route",
+              label: "Debug Performance Times",
+              component: DebugPerformanceTimesSettingsPage,
+              icon: assets3.getIndexByName("TimerIcon")
+            });
+            addTableRowsToAdvancedSectionInRevengePage(() => {
+              useObservable([
+                storage
+              ]);
+              return /* @__PURE__ */ jsx(TableSwitchRow, {
+                label: "Show Developer Options",
+                icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                  source: assets3.getIndexByName("WrenchIcon")
+                }),
+                value: storage.settingsRowShown,
+                onValueChange: (v2) => storage.settingsRowShown = v2
+              });
+            });
+          })();
+        },
+        initializeStorage: () => ({
+          settingsRowShown: false,
+          reactDevTools: {
+            address: "localhost:8097",
+            autoConnect: false
+          }
+        })
+      }, true);
+      PluginContext = React.createContext(null);
+    }
+  });
+
+  // src/plugins/warnings/index.ts
+  var MinimumSupportedBuildNumber;
+  var init_warnings = __esm({
+    "src/plugins/warnings/index.ts"() {
+      "use strict";
+      init_common();
+      init_native();
+      init_internals();
+      MinimumSupportedBuildNumber = ReactNative3.Platform.select({
+        android: 254e3,
+        ios: 65235
+      });
+      registerPlugin(
+        {
+          name: "Warnings",
+          author: "The Revenge Team",
+          description: "Startup warnings for users that are not using the recommended defaults for Revenge",
+          id: "revenge.warnings",
+          version: "1.0.0",
+          icon: "WarningIcon",
+          afterAppRender({ revenge: { assets: assets3, modules: modules2 }, storage }) {
+            var { legacy_alerts: legacy_alerts2, toasts: toasts2 } = modules2.common;
+            if ((storage.supportWarningDismissedAt ?? Date.now()) + 6048e5 > Date.now()) {
+              legacy_alerts2.show({
+                title: "Support Warning",
+                body: (
+                  // biome-ignore lint/style/useTemplate: I can't see the whole message when not doing concatenation
+                  `Revenge does not officially support this build of Discord. Please update to a newer version as some features may not work as expected.
+
+Supported Builds: 250.0 (${MinimumSupportedBuildNumber}) or after
+Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
+                ),
+                confirmText: "Remind me in 7 days",
+                onConfirm: () => {
+                  storage.supportWarningDismissedAt = Date.now();
+                  toasts2.open({
+                    key: "revenge.toasts.warnings.support-warning.dismissed",
+                    content: "You will see this warning again in 7 days",
+                    icon: assets3.getIndexByName("ic_warning_24px")
+                  });
+                }
+              });
+            }
+          }
+        },
+        true,
+        // We do !> instead of < in case the value of the left is NaN
+        () => !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber)
+      );
+    }
+  });
+
   // src/plugins/index.ts
   var plugins_exports = {};
   var init_plugins = __esm({
     "src/plugins/index.ts"() {
       "use strict";
-      init_warnings();
       init_settings2();
       init_staff_settings();
+      init_developer_settings();
+      init_warnings();
     }
   });
 
@@ -3827,33 +4061,29 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   function _initialize() {
     _initialize = // ! This function is BLOCKING, so we need to make sure it's as fast as possible
     _async_to_generator(function* () {
-      var [{ createModulesLibrary: createModulesLibrary2 }, UIColorsLibrary, { SettingsUILibrary: SettingsUILibrary2 }] = yield Promise.all([
-        Promise.resolve().then(() => (init_src3(), src_exports)),
-        Promise.resolve().then(() => (init_colors(), colors_exports)),
-        Promise.resolve().then(() => (init_settings(), settings_exports))
-      ]);
       recordTimestamp("Init_Initialize");
       Object.freeze = Object.seal = (o) => o;
-      var UILibrary = {
-        settings: SettingsUILibrary2,
-        colors: UIColorsLibrary
-      };
       try {
+        var [{ createModulesLibrary: createModulesLibrary2 }, UIColorsLibrary, { SettingsUILibrary: SettingsUILibrary2 }] = yield Promise.all([
+          Promise.resolve().then(() => (init_src3(), src_exports)),
+          Promise.resolve().then(() => (init_colors(), colors_exports)),
+          Promise.resolve().then(() => (init_settings(), settings_exports))
+        ]);
         var ModulesLibraryPromise = createModulesLibrary2();
-        var [{ AppLibrary: AppLibrary2 }, { AssetsLibrary: AssetsLibrary2 }] = yield Promise.all([
-          Promise.resolve().then(() => (init_src6(), src_exports4)),
-          Promise.resolve().then(() => (init_src7(), src_exports5))
+        var UILibrary = {
+          settings: SettingsUILibrary2,
+          colors: UIColorsLibrary
+        };
+        var [{ AppLibrary: AppLibrary2, errorBoundaryPatchedPromise: errorBoundaryPatchedPromise2 }, { AssetsLibrary: AssetsLibrary2 }] = yield Promise.all([
+          Promise.resolve().then(() => (init_src4(), src_exports2)),
+          Promise.resolve().then(() => (init_src5(), src_exports3))
         ]);
         var ModulesLibrary = yield ModulesLibraryPromise;
-        var [{ PluginsLibrary: PluginsLibrary2, startCorePlugins: startCorePlugins2, startCorePluginsMetroModuleSubscriptions: startCorePluginsMetroModuleSubscriptions2 }, { awaitStorage: awaitStorage2 }] = yield Promise.all([
+        var PreferencesLibrary = Promise.resolve().then(() => (init_src7(), src_exports5));
+        var [{ PluginsLibrary: PluginsLibrary2, startCorePlugins: startCorePlugins2, startPluginsMetroModuleSubscriptions: startCorePluginsMetroModuleSubscriptions }, { awaitStorage: awaitStorage2 }] = yield Promise.all([
           Promise.resolve().then(() => (init_src8(), src_exports6)),
-          Promise.resolve().then(() => (init_src4(), src_exports2))
+          Promise.resolve().then(() => (init_src6(), src_exports4))
         ]);
-        var PreferencesLibrary = Promise.resolve().then(() => (init_src5(), src_exports3));
-        var CorePlugins = Promise.resolve().then(() => (init_plugins(), plugins_exports)).then(() => {
-          recordTimestamp("Plugins_CoreImported");
-          startCorePluginsMetroModuleSubscriptions2();
-        });
         globalThis.revenge = {
           app: AppLibrary2,
           assets: AssetsLibrary2,
@@ -3861,19 +4091,19 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           plugins: PluginsLibrary2,
           ui: UILibrary
         };
-        PreferencesLibrary.then(/* @__PURE__ */ function() {
-          var _ref = _async_to_generator(function* ({ settings: settings2 }) {
-            yield awaitStorage2(settings2);
-            recordTimestamp("Storage_Initialized");
-            CorePlugins.then(() => {
-              startCorePlugins2();
-              recordTimestamp("Plugins_CoreStarted");
-            });
-          });
-          return function(_2) {
-            return _ref.apply(this, arguments);
-          };
-        }());
+        var CorePlugins = Promise.resolve().then(() => (init_plugins(), plugins_exports)).then(() => {
+          recordTimestamp("Plugins_CoreImported");
+          startCorePluginsMetroModuleSubscriptions();
+        });
+        _async_to_generator(function* () {
+          if (ReactNative.Platform.OS !== "ios") yield errorBoundaryPatchedPromise2;
+          var { settings: settings2 } = yield PreferencesLibrary;
+          yield awaitStorage2(settings2);
+          recordTimestamp("Storage_Initialized");
+          yield CorePlugins;
+          yield startCorePlugins2();
+          recordTimestamp("Plugins_CoreStarted");
+        })();
       } catch (e) {
         onError(e);
       }
@@ -3881,7 +4111,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     return _initialize.apply(this, arguments);
   }
   function onError(e) {
-    console.error(`Failed to load Revenge: ${getErrorStack(e)}`);
+    logger4.error(`Failed to load Revenge: ${getErrorStack(e)}`);
     alert([
       "Failed to load Revenge\n",
       `Build Number: ${ClientInfoModule.Build}`,
@@ -3891,7 +4121,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   var requireFunc;
   var initialized = false;
   var patcher4 = createPatcherInstance("revenge.library.init");
-  var logger2 = createLogger("init");
+  var logger4 = createLogger("init");
   var ErrorTypeWhitelist = [
     ReferenceError,
     TypeError,
@@ -3899,7 +4129,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   ];
   Promise._m = (promise, err) => {
     if (err) setTimeout(() => {
-      if (promise._h === 0) logger2.error(`Unhandled promise rejection: ${getErrorStack(err)}`);
+      if (promise._h === 0) logger4.error(`Unhandled promise rejection: ${getErrorStack(err)}`);
     }, ErrorTypeWhitelist.some((it) => err instanceof it) ? 0 : 2e3);
   };
   if (typeof __r !== "undefined") initialize();

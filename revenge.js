@@ -1118,7 +1118,7 @@
       orig(...args);
       moment.locale(origLocale);
     }));
-    subscribePatchableModule("i", (exports) => exports.default?.type?.name === "PortalKeyboardPlaceholder", (exports) => patcher5.instead(exports.default, "type", () => null));
+    if (ReactNative.Platform.OS === "ios") subscribePatchableModule("i", (exports) => exports.default?.type?.name === "PortalKeyboardPlaceholder", (exports) => patcher5.instead(exports.default, "type", () => null));
   }
   function subscribePatchableModule(patchId, filter, patch) {
     var cachedId = cache.patchableModules[patchId];
@@ -1836,7 +1836,7 @@
                 ") \u2022 Revenge ",
                 "local",
                 " (",
-                "49d888d",
+                "b5696d1",
                 false ? "-dirty" : "",
                 ")"
               ]
@@ -3413,7 +3413,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               {
                 label: "Revenge",
                 icon: assets.getIndexByName("Revenge.RevengeIcon"),
-                trailing: `${"local"} (${"49d888d"}${false ? "-dirty" : ""})`
+                trailing: `${"local"} (${"b5696d1"}${false ? "-dirty" : ""})`
               },
               {
                 label: "Discord",

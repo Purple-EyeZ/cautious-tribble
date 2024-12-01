@@ -260,14 +260,12 @@
           }
           var resolved = contextHolder?.factory();
           if (!resolved) throw new Error(`Cannot read properties of ${typeof resolved} (reading '${String(p)}')`);
-          if (typeof resolved !== "object") return resolved[p];
           return Reflect.get(resolved, p, receiver);
         },
         ownKeys: (target) => {
           var contextHolder = proxyContextHolder.get(target);
           var resolved = contextHolder?.factory();
           if (!resolved) throw new Error(`Cannot get keys of ${typeof resolved}`);
-          if (typeof resolved !== "object") return [];
           var cacheKeys = Reflect.ownKeys(resolved);
           for (var key of unconfigurable) {
             if (!cacheKeys.includes(key)) cacheKeys.push(key);
@@ -278,7 +276,6 @@
           var contextHolder = proxyContextHolder.get(target);
           var resolved = contextHolder?.factory();
           if (!resolved) throw new Error(`Cannot get property descriptor of ${typeof resolved} (getting '${String(p)}')`);
-          if (typeof resolved !== "object") throw new Error(`The value of type ${typeof resolved} does not have any descriptors (getting '${String(p)}')`);
           if (isUnconfigurable(p)) return Reflect.getOwnPropertyDescriptor(target, p);
           var descriptor = Reflect.getOwnPropertyDescriptor(resolved, p);
           if (descriptor) Object.defineProperty(target, p, descriptor);
@@ -469,7 +466,7 @@
       var debugKey = args[3] ?? "[NO_DEBUG_KEY]";
       var callback = args[2];
       args[2] = function patchedCallback(patchArgs, origOrRval) {
-        if (__DEV__) console.debug(`Patch ${name}:${debugKey} is intercepting`);
+        if (void 0) console.debug(`Patch ${name}:${debugKey} is intercepting`);
         try {
           return callback.apply(this, [
             patchArgs,
@@ -861,7 +858,7 @@
           return find.eager(byStoreName(name));
         }
       });
-      findByFilePath = Object.assign(function findByFilePathLazy(path, returnDefaultExport = true) {
+      findByFilePath = Object.assign(function findByFilePathLazy(path, returnDefaultExport = false) {
         return find(byFilePath(path, returnDefaultExport));
       }, {
         async: function findByFilePathAsync(path, returnDefaultExport = true, timeout = 1e3) {
@@ -1070,7 +1067,6 @@
          * - `d`: Block Discord analytics
          * - `s`: Block Sentry initialization
          * - `m`: Fix Moment locale
-         * - `i`: Attempt to fix iOS TextInputWrapper crash
          */
         patchableModules: {},
         /**
@@ -1082,9 +1078,9 @@
   });
 
   // libraries/modules/src/metro/patches.ts
-  function initializeModulePatches(patcher5, logger5, metroModules) {
+  function initializeModulePatches(patcher6, logger5, metroModules) {
     subscribePatchableModule("f", (exports) => exports.fileFinishedImporting, (exports) => {
-      patcher5.before(exports, "fileFinishedImporting", ([filePath]) => {
+      patcher6.before(exports, "fileFinishedImporting", ([filePath]) => {
         var importingModuleId2 = getImportingModuleId();
         if (importingModuleId2 === -1 || !filePath) return;
         metroModules[importingModuleId2][MetroModuleFilePathKey] = filePath;
@@ -1096,7 +1092,7 @@
       "register",
       "get"
     ].every((x2) => exports[x2]), (exports) => {
-      patcher5.instead(exports, "register", (args, origFunc) => {
+      patcher6.instead(exports, "register", (args, origFunc) => {
         try {
           return origFunc(...args);
         } catch (e) {
@@ -1113,12 +1109,11 @@
     });
     subscribePatchableModule("s", (m2) => m2.initSentry, (m2) => m2.initSentry = noop);
     subscribePatchableModule("d", (m2) => m2.default?.track && m2.default.trackMaker, (m2) => m2.default.track = () => noopPromise);
-    subscribePatchableModule("m", (m2) => m2.isMoment, (moment) => patcher5.instead(moment, "defineLocale", (args, orig) => {
+    subscribePatchableModule("m", (m2) => m2.isMoment, (moment) => patcher6.instead(moment, "defineLocale", (args, orig) => {
       var origLocale = moment.locale();
       orig(...args);
       moment.locale(origLocale);
     }));
-    if (ReactNative.Platform.OS === "ios") subscribePatchableModule("i", (exports) => exports.default?.type?.name === "PortalKeyboardPlaceholder", (exports) => patcher5.instead(exports.default, "type", () => null));
   }
   function subscribePatchableModule(patchId, filter, patch) {
     var cachedId = cache.patchableModules[patchId];
@@ -1169,14 +1164,14 @@
   function getImportingModuleId() {
     return importingModuleId;
   }
-  function resolveModuleDependencies(modules2, id) {
-    var metroModule = modules2[id];
+  function resolveModuleDependencies(modules3, id) {
+    var metroModule = modules3[id];
     if (!metroModule) return void metroDependencies.delete(id);
     if (!metroModule.dependencyMap || resolvedModules.has(id)) return;
     resolvedModules.add(id);
     for (var depId of metroModule.dependencyMap) {
       metroDependencies.add(depId);
-      resolveModuleDependencies(modules2, depId);
+      resolveModuleDependencies(modules3, depId);
     }
   }
   function hookModule(id, metroModule) {
@@ -1186,9 +1181,9 @@
         blacklistModule(id);
         return false;
       }
-      var subs = subscriptions.get(id);
+      var subs = subscriptions[id];
       if (subs) for (var sub of subs) sub(id, metroModule.publicModule.exports);
-      for (var sub1 of allSubscriptionSet) sub1(id, metroModule.publicModule.exports);
+      for (var sub1 of subscriptions.all) sub1(id, metroModule.publicModule.exports);
       return false;
     }
     var unpatch2 = patcher.instead(metroModule, "factory", (args, origFunc) => {
@@ -1204,9 +1199,9 @@
       }
       if (isModuleExportsBad(moduleObject.exports)) blacklistModule(id);
       else {
-        var subs2 = subscriptions.get(id);
+        var subs2 = subscriptions[id];
         if (subs2) for (var sub2 of subs2) sub2(id, moduleObject.exports);
-        for (var sub12 of allSubscriptionSet) sub12(id, moduleObject.exports);
+        for (var sub12 of subscriptions.all) sub12(id, moduleObject.exports);
       }
       importingModuleId = originalImportingId;
     }, "moduleFactory");
@@ -1241,11 +1236,8 @@
       } while (id1 = moduleIds.next().value);
       recordTimestamp("Modules_HookedFactories");
       if (!cacheRestored) {
-        var unpatch2 = patcher.before(ReactNative.AppRegistry, "runApplication", () => {
-          unpatch2();
-          requireAssetModules();
-          recordTimestamp("Modules_RequiredAssets");
-        }, "createAssetCache");
+        requireAssetModules();
+        recordTimestamp("Modules_RequiredAssets");
       }
       cache.totalModules = metroDependencies.size;
       saveCache();
@@ -1307,10 +1299,7 @@
         var mid = Number(id1);
         if (isModuleBlacklisted(mid)) continue;
         var exports = requireModule(mid);
-        if (isModuleExportsBad(exports)) {
-          blacklistModule(id1);
-          continue;
-        }
+        if (!exports) continue;
         yield [
           mid,
           exports
@@ -1321,7 +1310,7 @@
   function isModuleExportsBad(exports) {
     return typeof exports === "undefined" || exports === null || exports === globalThis || exports[""] === null || exports.__proto__ === Object.prototype && Reflect.ownKeys(exports).length === 0;
   }
-  var importingModuleId, subscriptions, allSubscriptionSet, metroDependencies, dependencies, resolvedModules, subscribeModule;
+  var importingModuleId, subscriptions, metroDependencies, dependencies, resolvedModules, subscribeModule;
   var init_metro = __esm({
     "libraries/modules/src/metro/index.ts"() {
       "use strict";
@@ -1333,15 +1322,15 @@
       init_patches();
       init_caches();
       importingModuleId = -1;
-      subscriptions = /* @__PURE__ */ new Map();
-      allSubscriptionSet = /* @__PURE__ */ new Set();
-      subscriptions.set("all", allSubscriptionSet);
+      subscriptions = {
+        all: /* @__PURE__ */ new Set()
+      };
       metroDependencies = /* @__PURE__ */ new Set();
       dependencies = metroDependencies;
       resolvedModules = /* @__PURE__ */ new Set();
       subscribeModule = Object.assign(function subscribeModule2(id, callback) {
-        if (!subscriptions.has(id)) subscriptions.set(id, /* @__PURE__ */ new Set());
-        var set = subscriptions.get(id);
+        if (!(id in subscriptions)) subscriptions[id] = /* @__PURE__ */ new Set();
+        var set = subscriptions[id];
         set.add(callback);
         return () => set.delete(callback);
       }, {
@@ -1365,8 +1354,8 @@
              * @returns A function to unsubscribe
              */
         all: function subscribeModuleAll(callback) {
-          allSubscriptionSet.add(callback);
-          return () => allSubscriptionSet.delete(callback);
+          subscriptions.all.add(callback);
+          return () => subscriptions.all.delete(callback);
         }
       });
     }
@@ -1413,7 +1402,7 @@
     createFilter: () => createFilter,
     createSimpleFilter: () => createSimpleFilter
   });
-  var byProps, byMutableProp, byName, byDisplayName, byTypeName, byStoreName, byFilePath, bySingleProp, byQuery;
+  var byProps, byMutableProp, byName, byDisplayName, byTypeName, byStoreName, modules2, byFilePath, bySingleProp, byQuery;
   var init_filters2 = __esm({
     "libraries/modules/src/filters.ts"() {
       "use strict";
@@ -1427,15 +1416,16 @@
       byDisplayName = createFilter(([displayName], m2) => m2.displayName === displayName, (name) => `revenge.displayName(${name})`);
       byTypeName = createFilter(([typeName], m2) => m2.type?.name === typeName, (name) => `revenge.typeName(${name})`);
       byStoreName = createFilter(([name], m2) => m2.getName?.length === 0 && m2.getName() === name, (name) => `revenge.storeName(${name})`);
+      modules2 = getMetroModules();
       byFilePath = createFilter(([path, returnDefaultExport], _2, id, isDefaultExport) => {
-        return returnDefaultExport === isDefaultExport && getMetroModules()[id]?.[MetroModuleFilePathKey] === path;
+        return returnDefaultExport === isDefaultExport && modules2[id]?.[MetroModuleFilePathKey] === path;
       }, ([path, returnDefaultExport]) => `revenge.filePath(${path},${returnDefaultExport})`);
       bySingleProp = createFilter(([prop], m2) => m2[prop] && Object.keys(m2).length === 1, (prop) => `revenge.singleProp(${prop})`);
       byQuery = createFilter(([query, caseSensitive], m2) => {
         var applyStringTransformation = (str) => caseSensitive ? str : str.toLowerCase();
         var transformedQuery = applyStringTransformation(query);
         try {
-          return m2.name?.toLowerCase()?.includes(transformedQuery) || m2.displayName?.toLowerCase()?.includes(transformedQuery) || m2.type?.name?.toLowerCase()?.includes(transformedQuery) || m2.getName?.length === 0 && m2.getName?.()?.toLowerCase()?.includes(transformedQuery) || getMetroModules()[m2.id]?.[MetroModuleFilePathKey]?.toLowerCase()?.includes(transformedQuery) || Object.keys(m2).some((k) => k.toLowerCase().includes(transformedQuery)) || Object.values(m2).some((v2) => String(v2).toLowerCase().includes(transformedQuery));
+          return m2.name?.toLowerCase()?.includes(transformedQuery) || m2.displayName?.toLowerCase()?.includes(transformedQuery) || m2.type?.name?.toLowerCase()?.includes(transformedQuery) || m2.getName?.length === 0 && m2.getName?.()?.toLowerCase()?.includes(transformedQuery) || modules2[m2.id]?.[MetroModuleFilePathKey]?.toLowerCase()?.includes(transformedQuery) || Object.keys(m2).some((k) => k.toLowerCase().includes(transformedQuery)) || Object.values(m2).some((v2) => String(v2).toLowerCase().includes(transformedQuery));
         } catch (e) {
           return false;
         }
@@ -1443,7 +1433,26 @@
     }
   });
 
-  // libraries/modules/src/common/components.ts
+  // libraries/modules/src/common/components/icons.ts
+  var icons_exports = {};
+  __export(icons_exports, {
+    CopyIcon: () => CopyIcon
+  });
+  function wrapIcon(Comp) {
+    return function IconElement(props) {
+      return Comp(props ?? {});
+    };
+  }
+  var CopyIcon;
+  var init_icons = __esm({
+    "libraries/modules/src/common/components/icons.ts"() {
+      "use strict";
+      init_finders();
+      CopyIcon = wrapIcon(findProp("CopyIcon"));
+    }
+  });
+
+  // libraries/modules/src/common/components/index.ts
   var components_exports = {};
   __export(components_exports, {
     AlertActionButton: () => AlertActionButton,
@@ -1457,6 +1466,7 @@
     FormSwitch: () => FormSwitch,
     GhostInput: () => GhostInput,
     IconButton: () => IconButton,
+    Icons: () => icons_exports,
     ImageButton: () => ImageButton,
     MasonryFlashList: () => MasonryFlashList,
     PressableScale: () => PressableScale,
@@ -1482,10 +1492,11 @@
   });
   var SafeAreaProvider, SafeAreaView, TwinButtons, Button, IconButton, ImageButton, FloatingActionButton, RowButton, TableRow, TableSwitchRow, TableRowGroup, TableRowGroupTitle, TableRowIcon, TableRadioGroup, TableCheckboxRow, TableRadioRow, AlertModal, AlertActionButton, TextInput, TextField, TextArea, GhostInput, Card, Stack, Slider, Text, PressableScale, TableRowTrailingText, FormSwitch, FormRadio, FormCheckbox, FlashList, MasonryFlashList;
   var init_components = __esm({
-    "libraries/modules/src/common/components.ts"() {
+    "libraries/modules/src/common/components/index.ts"() {
       "use strict";
       init_lazy();
       init_finders();
+      init_icons();
       ({ SafeAreaProvider, SafeAreaView } = lazyDestructure(() => findByProps.eager("useSafeAreaInsets")));
       TwinButtons = findProp("TwinButtons");
       ({
@@ -1599,7 +1610,8 @@
     NavigationNative: () => NavigationNative,
     NavigationStack: () => NavigationStack,
     React: () => React2,
-    ReactNative: () => ReactNative2,
+    ReactJSXRuntime: () => ReactJSXRuntime,
+    ReactNative: () => ReactNative,
     TextStyleSheet: () => TextStyleSheet,
     alerts: () => alerts,
     assetsRegistry: () => assetsRegistry,
@@ -1624,7 +1636,7 @@
     tokens: () => tokens,
     xxhash64: () => xxhash64
   });
-  var constants, tokens, intl, intlModule, Logger, legacy_alerts, alerts, channels, links, clipboard, invites, commands, toasts, messages, NavigationStack, NavigationNative, TextStyleSheet, createStyles, dismissAlerts, openAlert, Flux, FluxDispatcher, assetsRegistry, React2, ReactNative2, semver, xxhash64, nobleHashesUtils;
+  var constants, tokens, intl, intlModule, Logger, legacy_alerts, alerts, channels, links, clipboard, invites, commands, toasts, messages, NavigationStack, NavigationNative, TextStyleSheet, createStyles, dismissAlerts, openAlert, Flux, FluxDispatcher, assetsRegistry, React2, ReactNative, ReactJSXRuntime, semver, xxhash64, nobleHashesUtils;
   var init_common = __esm({
     "libraries/modules/src/common/index.ts"() {
       "use strict";
@@ -1654,8 +1666,8 @@
       Flux = findByProps("connectStores");
       FluxDispatcher = findByProps("_interceptors");
       assetsRegistry = findByProps("registerAsset");
-      React2 = globalThis.React;
-      ReactNative2 = globalThis.ReactNative;
+      ({ React: React2, ReactNative } = lazyDestructure(() => globalThis));
+      ReactJSXRuntime = findByProps("jsx", "jsxs");
       semver = findByProps("SEMVER_SPEC_VERSION");
       xxhash64 = findByProps("XXH64");
       nobleHashesUtils = findByProps("randomBytes");
@@ -1760,6 +1772,74 @@
     }
   });
 
+  // libraries/react/src/shared.ts
+  var patcher2;
+  var init_shared2 = __esm({
+    "libraries/react/src/shared.ts"() {
+      "use strict";
+      init_src2();
+      patcher2 = createPatcherInstance("revenge.react");
+    }
+  });
+
+  // libraries/react/src/jsx.ts
+  var jsx_exports = {};
+  __export(jsx_exports, {
+    ReactJSXLibrary: () => ReactJSXLibrary,
+    afterJSXElementCreate: () => afterJSXElementCreate,
+    beforeJSXElementCreate: () => beforeJSXElementCreate,
+    isNativeJSXElement: () => isNativeJSXElement
+  });
+  function afterJSXElementCreate(elementName, callback) {
+    if (!(elementName in afterCallbacks)) afterCallbacks[elementName] = /* @__PURE__ */ new Set();
+    afterCallbacks[elementName].add(callback);
+  }
+  function beforeJSXElementCreate(elementName, callback) {
+    if (!(elementName in beforeCallbacks)) beforeCallbacks[elementName] = /* @__PURE__ */ new Set();
+    beforeCallbacks[elementName].add(callback);
+  }
+  function isNativeJSXElement(element) {
+    return typeof element === "string";
+  }
+  var beforeCallbacks, afterCallbacks, patchCallback, ReactJSXLibrary;
+  var init_jsx = __esm({
+    "libraries/react/src/jsx.ts"() {
+      "use strict";
+      init_common();
+      init_shared2();
+      beforeCallbacks = {};
+      afterCallbacks = {};
+      patchCallback = (args, orig) => {
+        var [Comp, props] = args;
+        var name = typeof Comp === "string" ? Comp : Comp.name ?? // @ts-expect-error
+        (typeof Comp.type === "string" ? Comp.type : Comp.type?.name) ?? Comp.displayName;
+        if (!name) return orig.apply(ReactJSXRuntime, args);
+        var newArgs = args;
+        if (name in beforeCallbacks) for (var cb of beforeCallbacks[name]) {
+          var maybeArgs = cb(newArgs);
+          if (maybeArgs) newArgs = maybeArgs;
+        }
+        var tree = orig.apply(ReactJSXRuntime, newArgs);
+        if (name in afterCallbacks) {
+          for (var cb1 of afterCallbacks[name]) {
+            var maybeTree = cb1(Comp, props, tree);
+            if (typeof maybeTree !== "undefined") tree = maybeTree;
+          }
+        }
+        return tree;
+      };
+      setTimeout(() => {
+        patcher2.instead(ReactJSXRuntime, "jsx", patchCallback, "patchJsxRuntime");
+        patcher2.instead(ReactJSXRuntime, "jsxs", patchCallback, "patchJsxRuntime");
+      });
+      ReactJSXLibrary = {
+        beforeElementCreate: beforeJSXElementCreate,
+        afterElementCreate: afterJSXElementCreate,
+        isNativeElement: isNativeJSXElement
+      };
+    }
+  });
+
   // libraries/ui/src/colors.ts
   var colors_exports = {};
   __export(colors_exports, {
@@ -1836,7 +1916,7 @@
                 ") \u2022 Revenge ",
                 "local",
                 " (",
-                "b5696d1",
+                "91dc2e9",
                 false ? "-dirty" : "",
                 ")"
               ]
@@ -2053,21 +2133,20 @@
   var src_exports2 = {};
   __export(src_exports2, {
     AppLibrary: () => AppLibrary,
-    afterAppInitialized: () => afterAppInitialized,
-    afterAppRendered: () => afterAppRendered,
-    errorBoundaryPatchedPromise: () => errorBoundaryPatchedPromise,
+    afterAppInitialize: () => afterAppInitialize,
+    afterAppRender: () => afterAppRender,
     isAppInitialized: () => isAppInitialized,
     isAppRendered: () => isAppRendered
   });
-  function afterAppInitialized(callback) {
+  function afterAppInitialize(callback) {
     if (isAppInitialized) throw new Error("Cannot attach a callback after the app has already been initialized");
     initializeCallbacks.add(callback);
   }
-  function afterAppRendered(callback) {
+  function afterAppRender(callback) {
     if (isAppRendered) throw new Error("Cannot attach a callback after the App component has been rendered");
     renderCallbacks.add(callback);
   }
-  var patcher2, logger2, initializeCallbacks, renderCallbacks, isAppInitialized, isAppRendered, unpatchRunApplication, unpatchCreateElement, resolveErrorBoundaryPatched, errorBoundaryPatchedPromise, afterErrorBoundaryPatchable, AppLibrary;
+  var patcher3, logger2, initializeCallbacks, renderCallbacks, isAppInitialized, isAppRendered, unpatchRunApplication, unpatchCreateElement, afterErrorBoundaryPatchable, AppLibrary;
   var init_src4 = __esm({
     "libraries/app/src/index.tsx"() {
       "use strict";
@@ -2078,17 +2157,18 @@
       init_finders();
       init_native();
       init_src2();
+      init_jsx();
       init_library();
-      patcher2 = createPatcherInstance("revenge.library.app");
+      patcher3 = createPatcherInstance("revenge.library.app");
       logger2 = createLogger("app");
       logger2.log("Library loaded");
       initializeCallbacks = /* @__PURE__ */ new Set();
       renderCallbacks = /* @__PURE__ */ new Set();
       isAppInitialized = false;
       isAppRendered = false;
-      afterAppInitialized(() => isAppInitialized = true);
-      afterAppRendered(() => isAppRendered = true);
-      unpatchRunApplication = patcher2.after(ReactNative2.AppRegistry, "runApplication", () => {
+      afterAppInitialize(() => isAppInitialized = true);
+      afterAppRender(() => isAppRendered = true);
+      unpatchRunApplication = patcher3.after(ReactNative.AppRegistry, "runApplication", () => {
         unpatchRunApplication();
         recordTimestamp("App_RunApplicationCalled");
         logger2.log("AppRegistry.runApplication called");
@@ -2096,7 +2176,7 @@
         recordTimestamp("App_AfterRunRACallbacks");
         logger2.log("Initialized callbacks called");
       }, "runInitializeCallbacks");
-      unpatchCreateElement = patcher2.after(React2, "createElement", () => {
+      unpatchCreateElement = patcher3.after(React2, "createElement", () => {
         unpatchCreateElement();
         recordTimestamp("App_CreateElementCalled");
         logger2.log("React.createElement called");
@@ -2104,13 +2184,13 @@
         recordTimestamp("App_AfterRunCECallbacks");
         logger2.log("Rendered callbacks called");
       }, "runRenderCallbacks");
-      errorBoundaryPatchedPromise = new Promise((resolve) => resolveErrorBoundaryPatched = resolve);
-      afterErrorBoundaryPatchable = ReactNative2.Platform.OS === "ios" ? afterAppRendered : afterAppInitialized;
+      afterErrorBoundaryPatchable = ReactNative.Platform.OS === "ios" ? afterAppRender : afterAppInitialize;
       afterErrorBoundaryPatchable(/* @__PURE__ */ function() {
         var _patchErrorBoundary = _async_to_generator(function* () {
+          if (ReactNative.Platform.OS === "ios") ReactJSXLibrary.afterElementCreate("PortalKeyboardPlaceholderInner", () => null);
           var { default: Screen } = yield Promise.resolve().then(() => (init_ErrorBoundaryScreen(), ErrorBoundaryScreen_exports));
           setImmediate(() => {
-            patcher2.after.await(findByName.async("ErrorBoundary").then((it) => it.prototype), "render", function() {
+            patcher3.after.await(findByName.async("ErrorBoundary").then((it) => it.prototype), "render", function() {
               if (this.state.error) return /* @__PURE__ */ jsx(Screen, {
                 error: this.state.error,
                 rerender: () => this.setState({
@@ -2121,7 +2201,6 @@
               });
             }, "patchErrorBoundary");
             logger2.log("ErrorBoundary patched");
-            resolveErrorBoundaryPatched();
           });
         });
         function patchErrorBoundary() {
@@ -2146,12 +2225,12 @@
          * Attaches a callback to be called when the app has been rendered
          * @param callback The callback to be called
          */
-        afterRendered: afterAppRendered,
+        afterRender: afterAppRender,
         /**
          * Attaches a callback to be called when the app has been initialized
          * @param callback The callback to be called
          */
-        afterInitialized: afterAppInitialized,
+        afterInitialize: afterAppInitialize,
         /**
          * Reloads the app
          */
@@ -2204,7 +2283,7 @@
     if (!moduleId) return;
     return cache.assets[name] ??= requireModule(moduleId);
   }
-  var patcher3, CustomAssetBrandKey, customAssets, AssetSourceResolver, assetsIndex, AssetsLibrary;
+  var patcher4, CustomAssetBrandKey, customAssets, AssetSourceResolver, assetsIndex, AssetsLibrary;
   var init_src5 = __esm({
     "libraries/assets/src/index.ts"() {
       "use strict";
@@ -2212,17 +2291,17 @@
       init_finders();
       init_metro();
       init_src2();
-      patcher3 = createPatcherInstance("revenge.library.assets");
+      patcher4 = createPatcherInstance("revenge.library.assets");
       CustomAssetBrandKey = "__revenge_asset";
       customAssets = {};
-      patcher3.after(assetsRegistry, "registerAsset", ([asset], index) => {
-        var moduleId = getImportingModuleId();
+      patcher4.after(assetsRegistry, "registerAsset", ([asset], index) => {
         if (CustomAssetBrandKey in asset) return;
+        var moduleId = getImportingModuleId();
         cacheAsset(asset.name, index, moduleId);
       }, "patchRegisterAsset");
       AssetSourceResolver = findByName.async("AssetSourceResolver").then((it) => it.prototype);
-      patcher3.instead.await(AssetSourceResolver, "defaultAsset", maybeResolveCustomAsset);
-      patcher3.instead.await(AssetSourceResolver, "fromSource", maybeResolveCustomAsset);
+      patcher4.instead.await(AssetSourceResolver, "defaultAsset", maybeResolveCustomAsset);
+      patcher4.instead.await(AssetSourceResolver, "fromSource", maybeResolveCustomAsset);
       assetsIndex = new Proxy({}, {
         get(cache2, prop) {
           if (cache2[prop]) return cache2[prop];
@@ -2991,9 +3070,10 @@
   // libraries/preferences/src/index.ts
   var src_exports5 = {};
   __export(src_exports5, {
+    pluginsStates: () => pluginsStates,
     settings: () => settings
   });
-  var settings;
+  var settings, pluginsStates;
   var init_src7 = __esm({
     "libraries/preferences/src/index.ts"() {
       "use strict";
@@ -3005,6 +3085,9 @@
             enabledNextLaunch: false
           }
         }
+      });
+      pluginsStates = createStorage("revenge/plugins/states.json", {
+        initial: {}
       });
     }
   });
@@ -3018,15 +3101,16 @@
       PluginStatus = {
         Stopped: 1,
         Fetching: 2,
-        Starting: 3,
-        Started: 4
+        StartedEarly: 3,
+        Starting: 4,
+        Started: 5
       };
     }
   });
 
   // libraries/plugins/src/shared.ts
   var logger3;
-  var init_shared2 = __esm({
+  var init_shared3 = __esm({
     "libraries/plugins/src/shared.ts"() {
       "use strict";
       init_common();
@@ -3037,7 +3121,7 @@
   // libraries/plugins/src/internals.ts
   function registerPlugin(definition, core = false, manageable = !core, predicate) {
     var cleanups = /* @__PURE__ */ new Set();
-    if (plugins.has(definition.id)) throw new Error(`Plugin "${definition.id}" already exists`);
+    if (definition.id in plugins) throw new Error(`Plugin "${definition.id}" already exists`);
     if (!PluginIdRegex.test(definition.id)) throw new Error(`Cannot register plugin "${definition.id}", invalid ID format`);
     var prepareStorageAndPatcher = () => {
       instance.patcher ||= createPatcherInstance(`revenge.plugins.plugin#${definition.id}`);
@@ -3047,30 +3131,39 @@
     };
     var internalPlugin = objectSeal({
       ...definition,
-      // Enabled by default if it is a core plugin, otherwise its enabled state will be modified after core plugins have started
-      enabled: predicate?.() ?? core,
+      get enabled() {
+        return manageable ? pluginsStates[definition.id]?.enabled ?? false : predicate?.() ?? core;
+      },
+      set enabled(val) {
+        if (!manageable) throw new Error(`Cannot enable/disable unmanageable plugin: ${this.id}`);
+        if (definition.id in pluginsStates) pluginsStates[definition.id].enabled = val;
+        else pluginsStates[definition.id] = {
+          enabled: val
+        };
+      },
+      get stopped() {
+        return this.status === PluginStatus.Stopped || this.status === PluginStatus.StartedEarly;
+      },
       core,
       manageable,
       status: PluginStatus.Stopped,
       SettingsComponent: definition.settings,
       errors: [],
-      get stopped() {
-        return this.status === PluginStatus.Stopped;
-      },
       disable() {
-        if (!this.manageable) throw new Error(`Cannot disable unmanageable plugin "${this.id}"`);
-        if (!this.stopped) this.stop();
+        if (!this.manageable) throw new Error(`Cannot disable unmanageable plugin: ${this.id}`);
         this.enabled = false;
+        if (!this.stopped) return this.stop();
+        return DefaultStopConfig;
       },
       enable() {
         this.enabled = true;
-        return !!this.beforeAppRender;
+        return !!(this.beforeAppRender || this.onMetroModuleLoad);
       },
       startMetroModuleSubscriptions() {
-        if (this.onMetroModuleLoad) {
-          prepareStorageAndPatcher();
-          var unsub = subscribeModule.all((id, exports) => this.onMetroModuleLoad(instance, id, exports, unsub));
-        }
+        if (!this.onMetroModuleLoad || !this.enabled) return;
+        prepareStorageAndPatcher();
+        var unsub = subscribeModule.all((id, exports) => this.onMetroModuleLoad(instance, id, exports, unsub));
+        this.status = PluginStatus.StartedEarly;
       },
       start() {
         return _async_to_generator(function* () {
@@ -3115,24 +3208,27 @@
         }).apply(this);
       },
       stop() {
-        if (this.stopped) return;
+        if (this.stopped) return DefaultStopConfig;
         logger3.log(`Stopping plugin: ${this.id}`);
+        var data;
         try {
-          this.beforeStop?.(instance);
+          var _$val = this.beforeStop?.(instance);
+          data ??= _$val ? Object.assign(DefaultStopConfig, _$val) : DefaultStopConfig;
         } catch (e) {
           this.errors.push(new Error(`Plugin "${this.id}" encountered an error when stopping: ${e}`, {
             cause: e
           }));
         }
-        for (var cleanup of cleanups) cleanup();
-        if (!instance.patcher.destroyed) instance.patcher.destroy();
-        this.status = PluginStatus.Stopped;
         if (this.errors.length) {
           var msg = `Plugin "${this.id}" encountered ${this.errors.length} errors
 ${this.errors.map(getErrorStack).join("\n")}`;
           logger3.error(msg);
           throw new AggregateError(this.errors, msg);
         }
+        for (var cleanup of cleanups) cleanup();
+        if (!instance.patcher.destroyed) instance.patcher.destroy();
+        this.status = PluginStatus.Stopped;
+        return data ?? DefaultStopConfig;
       }
     });
     var proxy = new Proxy(internalPlugin, {
@@ -3167,28 +3263,32 @@ ${this.errors.map(getErrorStack).join("\n")}`;
       }
     };
     if (internalPlugin.core) corePluginIds.add(internalPlugin.id);
-    plugins.set(internalPlugin.id, internalPlugin);
+    plugins[internalPlugin.id] = internalPlugin;
     if (internalPlugin.beforeAppRender) highPriorityPluginIds.add(internalPlugin.id);
     return proxy;
   }
-  var appRenderedCallbacks, corePluginIds, plugins, highPriorityPluginIds;
+  var appRenderedCallbacks, corePluginIds, plugins, highPriorityPluginIds, DefaultStopConfig;
   var init_internals = __esm({
     "libraries/plugins/src/internals.ts"() {
       "use strict";
       init_async_to_generator();
       init_src4();
       init_metro();
+      init_src7();
       init_src2();
       init_src6();
       init_errors();
       init_functions();
       init_lazy();
       init_constants2();
-      init_shared2();
+      init_shared3();
       appRenderedCallbacks = /* @__PURE__ */ new Set();
       corePluginIds = /* @__PURE__ */ new Set();
-      plugins = /* @__PURE__ */ new Map();
+      plugins = {};
       highPriorityPluginIds = /* @__PURE__ */ new Set();
+      DefaultStopConfig = {
+        reloadRequired: false
+      };
     }
   });
 
@@ -3208,7 +3308,7 @@ ${this.errors.map(getErrorStack).join("\n")}`;
     var promises = [];
     var errors = [];
     for (var id of corePluginIds) {
-      var plugin2 = plugins.get(id);
+      var plugin2 = plugins[id];
       if (!plugin2.enabled) continue;
       promises.push(plugin2.start().catch((e) => errors.push(e)));
     }
@@ -3219,7 +3319,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
   }
   function startPluginsMetroModuleSubscriptions() {
     logger3.info("Starting Metro module subscriptions for plugins...");
-    for (var plugin2 of plugins.values()) plugin2.startMetroModuleSubscriptions();
+    for (var plugin2 of Object.values(plugins)) plugin2.startMetroModuleSubscriptions();
   }
   var PluginsLibrary;
   var init_src8 = __esm({
@@ -3228,8 +3328,8 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       init_src4();
       init_errors();
       init_internals();
-      init_shared2();
-      afterAppRendered(() => {
+      init_shared3();
+      afterAppRender(() => {
         for (var cb of appRenderedCallbacks) cb();
       });
       PluginsLibrary = {
@@ -3413,7 +3513,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               {
                 label: "Revenge",
                 icon: assets.getIndexByName("Revenge.RevengeIcon"),
-                trailing: `${"local"} (${"b5696d1"}${false ? "-dirty" : ""})`
+                trailing: `${"local"} (${"91dc2e9"}${false ? "-dirty" : ""})`
               },
               {
                 label: "Discord",
@@ -3470,7 +3570,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
         toasts.open({
           key: `revenge.toasts.settings.about.copied:${props.label}`,
           content: "Copied to clipboard",
-          icon: assets.getIndexByName("CopyIcon")
+          icon: icons_exports.CopyIcon
         });
       }
     });
@@ -3516,12 +3616,27 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       returnKeyType: "search"
     });
   }
+  function FormSwitch2(props) {
+    return /* @__PURE__ */ jsx(import_react_native4.View, {
+      style: props.disabled ? styles3.disabled : void 0,
+      children: /* @__PURE__ */ jsx(FormSwitch, {
+        ...props
+      })
+    });
+  }
+  var import_react_native4, styles3;
   var init_components2 = __esm({
     "libraries/ui/src/components.tsx"() {
       "use strict";
       init_react_jsx_runtime();
       init_components();
       init_finders();
+      import_react_native4 = __toESM(require_react_native(), 1);
+      styles3 = import_react_native4.StyleSheet.create({
+        disabled: {
+          opacity: 0.5
+        }
+      });
     }
   });
 
@@ -3539,26 +3654,22 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
     return /* @__PURE__ */ jsxs(Card, {
       style: [
         cardStyles.card,
-        ...horizontalGaps ? [
-          {
-            marginRight: 12
-          }
-        ] : []
+        horizontalGaps && cardStyles.withGap
       ],
       children: [
         /* @__PURE__ */ jsxs(Stack, {
           direction: "horizontal",
-          style: styles3.growable,
+          style: styles4.growable,
           children: [
             /* @__PURE__ */ jsxs(Stack, {
               spacing: 8,
               direction: "horizontal",
               style: [
                 cardStyles.topContainer,
-                styles3.resizable
+                styles4.resizable
               ],
               children: [
-                /* @__PURE__ */ jsx(import_react_native4.Image, {
+                /* @__PURE__ */ jsx(import_react_native5.Image, {
                   source: getAssetIndexByName(icon ?? "Revenge.PluginIcon"),
                   style: cardStyles.icon
                 }),
@@ -3568,67 +3679,27 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
                 })
               ]
             }),
-            /* @__PURE__ */ jsx(import_react_native4.View, {
-              style: {
-                opacity: manageable ? 1 : 0.5
-              },
-              children: /* @__PURE__ */ jsx(FormSwitch, {
-                value: enabled,
-                disabled: !manageable,
-                onValueChange: /* @__PURE__ */ function() {
-                  var _ref = _async_to_generator(function* (val) {
-                    if (!val && core) {
-                      var _continue = yield new Promise((resolve) => {
-                        openAlert("revenge.plugins.settings.plugins.core-plugins.disable-warning", /* @__PURE__ */ jsx(AlertModal, {
-                          title: "Disable a core plugin?",
-                          content: "Core plugins are an essential part of Revenge. Disabling them may cause unexpected behavior.",
-                          actions: /* @__PURE__ */ jsxs(Fragment, {
-                            children: [
-                              /* @__PURE__ */ jsx(AlertActionButton, {
-                                variant: "destructive",
-                                text: "Disable anyways",
-                                onPress: () => resolve(true)
-                              }),
-                              /* @__PURE__ */ jsx(AlertActionButton, {
-                                variant: "secondary",
-                                text: "Cancel",
-                                onPress: () => resolve(false)
-                              })
-                            ]
-                          })
-                        }));
-                      });
-                      if (!_continue) return;
-                    }
-                    var plugin2 = plugins.get(id);
-                    if (val) {
-                      var reloadRequired = plugin2.enable();
-                      if (reloadRequired) openAlert("revenge.plugins.reload-required", /* @__PURE__ */ jsx(AlertModal, {
-                        title: "Reload required",
-                        content: "The plugin you have enabled requires a reload to take effect. Would you like to reload now?",
-                        actions: /* @__PURE__ */ jsxs(Fragment, {
-                          children: [
-                            /* @__PURE__ */ jsx(AlertActionButton, {
-                              variant: "destructive",
-                              text: "Reload",
-                              onPress: () => BundleUpdaterManager.reload()
-                            }),
-                            /* @__PURE__ */ jsx(AlertActionButton, {
-                              variant: "secondary",
-                              text: "Cancel"
-                            })
-                          ]
-                        })
-                      }));
-                      else plugin2.start();
-                    } else plugin2.disable();
-                    setEnabled(val);
-                  });
-                  return function(val) {
-                    return _ref.apply(this, arguments);
-                  };
-                }()
-              })
+            /* @__PURE__ */ jsx(FormSwitch2, {
+              value: enabled,
+              disabled: !manageable,
+              onValueChange: /* @__PURE__ */ function() {
+                var _ref = _async_to_generator(function* (enabled2) {
+                  if (!enabled2 && core && !(yield showDisableCorePluginConfirmation())) return;
+                  var plugin2 = plugins[id];
+                  if (enabled2) {
+                    var reloadRequired = plugin2.enable();
+                    if (reloadRequired) showReloadRequiredAlert(enabled2);
+                    else yield plugin2.start();
+                  } else {
+                    var { reloadRequired: reloadRequired1 } = plugin2.disable();
+                    if (reloadRequired1) showReloadRequiredAlert(enabled2);
+                  }
+                  setEnabled(enabled2);
+                });
+                return function(enabled2) {
+                  return _ref.apply(this, arguments);
+                };
+              }()
             })
           ]
         }),
@@ -3637,11 +3708,11 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
           direction: "vertical",
           style: [
             cardStyles.alignedContainer,
-            styles3.growable
+            styles4.growable
           ],
           children: [
             /* @__PURE__ */ jsxs(Text, {
-              style: styles3.growable,
+              style: styles4.growable,
               variant: "heading-md/medium",
               color: "text-muted",
               children: [
@@ -3650,7 +3721,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               ]
             }),
             /* @__PURE__ */ jsx(Text, {
-              style: styles3.growable,
+              style: styles4.growable,
               variant: "text-md/medium",
               children: description
             })
@@ -3661,11 +3732,9 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
   }
   function PluginsSettingsPage() {
     var [query, setQuery] = (0, import_react2.useState)("");
-    var dimensions = (0, import_react_native4.useWindowDimensions)();
+    var dimensions = (0, import_react_native5.useWindowDimensions)();
     var numColumns = Math.floor((dimensions.width - 16) / 448);
-    var data = (0, import_react2.useMemo)(() => [
-      ...plugins.values()
-    ].filter((plugin2) => plugin2.name.toLowerCase().replaceAll(/\s/g, "").includes(query) || plugin2.id.toLowerCase().includes(query)), [
+    var data = (0, import_react2.useMemo)(() => Object.values(plugins).filter((plugin2) => plugin2.name.toLowerCase().replaceAll(/\s/g, "").includes(query) || plugin2.id.toLowerCase().includes(query)), [
       query
     ]);
     return /* @__PURE__ */ jsxs(PageWrapper, {
@@ -3674,7 +3743,32 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
           size: "md",
           onChange: (query2) => setQuery(query2.replaceAll(/\s/g, "").toLowerCase())
         }),
-        /* @__PURE__ */ jsx(import_react_native4.ScrollView, {
+        /* @__PURE__ */ jsxs(import_react_native5.View, {
+          style: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "flex-end"
+          },
+          children: [
+            /* @__PURE__ */ jsx(TableRowGroupTitle, {
+              title: "Core Plugins"
+            }),
+            /* @__PURE__ */ jsx(IconButton, {
+              icon: getAssetIndexByName("CircleQuestionIcon-primary"),
+              size: "sm",
+              variant: "secondary",
+              onPress: () => openAlert("revenge.plugins.settings.plugins.core-plugins.description", /* @__PURE__ */ jsx(AlertModal, {
+                title: "What are core plugins?",
+                content: "Core plugins are an essential part of Revenge. They provide core functionalities like allowing you to access this settings menu. Disabling core plugins may cause unexpected behavior.",
+                actions: /* @__PURE__ */ jsx(AlertActionButton, {
+                  variant: "secondary",
+                  text: "Got it"
+                })
+              }))
+            })
+          ]
+        }),
+        /* @__PURE__ */ jsx(import_react_native5.ScrollView, {
           contentContainerStyle: {
             flex: 1
           },
@@ -3686,7 +3780,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               horizontalGaps: dimensions.width > 464 && columnIndex < numColumns - 1
             }),
             // Don't ask...
-            estimatedItemSize: 24.01 + 32 + 62 * import_react_native4.PixelRatio.getFontScale() ** 1.35,
+            estimatedItemSize: 24.01 + 32 + 62 * import_react_native5.PixelRatio.getFontScale() ** 1.35,
             keyExtractor: (item) => item.id,
             numColumns,
             keyboardShouldPersistTaps: "handled"
@@ -3695,7 +3789,48 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       ]
     });
   }
-  var import_react2, import_react_native4, usePluginCardStyles, styles3;
+  function showDisableCorePluginConfirmation() {
+    return new Promise((resolve) => {
+      openAlert("revenge.plugins.settings.plugins.core-plugins.disable-warning", /* @__PURE__ */ jsx(AlertModal, {
+        title: "Disable core plugin?",
+        content: "Core plugins are an essential part of Revenge. Disabling them may cause unexpected behavior.",
+        actions: /* @__PURE__ */ jsxs(Fragment, {
+          children: [
+            /* @__PURE__ */ jsx(AlertActionButton, {
+              variant: "destructive",
+              text: "Disable anyways",
+              onPress: () => resolve(true)
+            }),
+            /* @__PURE__ */ jsx(AlertActionButton, {
+              variant: "secondary",
+              text: "Cancel",
+              onPress: () => resolve(false)
+            })
+          ]
+        })
+      }));
+    });
+  }
+  function showReloadRequiredAlert(enabling) {
+    openAlert("revenge.plugins.reload-required", /* @__PURE__ */ jsx(AlertModal, {
+      title: "Reload required",
+      content: enabling ? "The plugin you have enabled requires a reload to take effect. Would you like to reload now?" : "The plugin you have disabled requires a reload to reverse its effects. Would you like to reload now?",
+      actions: /* @__PURE__ */ jsxs(Fragment, {
+        children: [
+          /* @__PURE__ */ jsx(AlertActionButton, {
+            variant: "destructive",
+            text: "Reload",
+            onPress: () => BundleUpdaterManager.reload()
+          }),
+          /* @__PURE__ */ jsx(AlertActionButton, {
+            variant: "secondary",
+            text: "Not now"
+          })
+        ]
+      })
+    }));
+  }
+  var import_react2, import_react_native5, usePluginCardStyles, styles4;
   var init_Plugins = __esm({
     "src/plugins/settings/pages/Plugins.tsx"() {
       "use strict";
@@ -3710,7 +3845,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       init_components2();
       init_Wrapper();
       import_react2 = __toESM(require_react(), 1);
-      import_react_native4 = __toESM(require_react_native(), 1);
+      import_react_native5 = __toESM(require_react_native(), 1);
       usePluginCardStyles = createStyles({
         icon: {
           width: 20,
@@ -3724,6 +3859,9 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
           paddingHorizontal: 12,
           gap: 4
         },
+        withGap: {
+          marginRight: 12
+        },
         topContainer: {
           alignItems: "center"
         },
@@ -3731,7 +3869,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
           paddingLeft: 28
         }
       });
-      styles3 = import_react_native4.StyleSheet.create({
+      styles4 = import_react_native5.StyleSheet.create({
         growable: {
           flexGrow: 1
         },
@@ -3749,7 +3887,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
     useObservable([
       settings
     ]);
-    return /* @__PURE__ */ jsx(import_react_native5.ScrollView, {
+    return /* @__PURE__ */ jsx(import_react_native6.ScrollView, {
       children: /* @__PURE__ */ jsxs(PageWrapper, {
         children: [
           /* @__PURE__ */ jsx(TableRowGroup, {
@@ -3790,7 +3928,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       for (var comp2 of comps) rows.delete(comp2);
     };
   }
-  var import_react_native5, rows;
+  var import_react_native6, rows;
   var init_Revenge = __esm({
     "src/plugins/settings/pages/Revenge.tsx"() {
       "use strict";
@@ -3801,7 +3939,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       init_src7();
       init_src6();
       init_Wrapper();
-      import_react_native5 = __toESM(require_react_native(), 1);
+      import_react_native6 = __toESM(require_react_native(), 1);
       rows = /* @__PURE__ */ new Set();
     }
   });
@@ -3828,7 +3966,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
         id: "revenge.settings",
         version: "1.0.0",
         icon: "SettingsIcon",
-        afterAppRender({ patcher: patcher5, revenge: { assets: assets2, modules: modules2, ui: { settings: sui } } }) {
+        afterAppRender({ patcher: patcher6, revenge: { assets: assets2, modules: modules3, ui: { settings: sui } } }) {
           return _async_to_generator(function* () {
             sui.createSection({
               name: "Revenge",
@@ -3861,8 +3999,8 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               predicate: () => false
             });
             yield sleep(0);
-            var SettingsConstants = modules2.findByProps("SETTING_RENDERER_CONFIG");
-            var SettingsOverviewScreen = modules2.findByName("SettingsOverviewScreen", false);
+            var SettingsConstants = modules3.findByProps("SETTING_RENDERER_CONFIG");
+            var SettingsOverviewScreen = modules3.findByName("SettingsOverviewScreen", false);
             var originalRendererConfig = SettingsConstants.SETTING_RENDERER_CONFIG;
             var rendererConfig = originalRendererConfig;
             Object.defineProperty(SettingsConstants, "SETTING_RENDERER_CONFIG", {
@@ -3874,7 +4012,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               }),
               set: (v2) => rendererConfig = v2
             });
-            patcher5.after(SettingsOverviewScreen, "default", (_2, children) => {
+            patcher6.after(SettingsOverviewScreen, "default", (_2, children) => {
               var registeredCustomRows = new Set(Object.values(customData.sections).flatMap(({ settings: settings2 }) => Object.keys(settings2)));
               var { sections } = findInReactTree(children, (i) => i.props?.sections).props;
               if (sections.findIndex((section2) => section2.settings.some((setting) => registeredCustomRows.has(setting))) !== -1) return;
@@ -3929,16 +4067,10 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
   });
 
   // src/plugins/staff-settings/index.tsx
-  var originalValue, isStaffSettingsShown;
   var init_staff_settings = __esm({
     "src/plugins/staff-settings/index.tsx"() {
       "use strict";
-      init_react_jsx_runtime();
-      init_components();
       init_internals();
-      init_src6();
-      init_Revenge();
-      isStaffSettingsShown = () => true;
       registerPlugin({
         name: "Staff Settings",
         author: "Revenge",
@@ -3951,34 +4083,17 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
             unsub();
             exports.default = new Proxy(exports.default, {
               get(target, property, receiver) {
-                if (property === "isDeveloper") {
-                  originalValue &&= Reflect.get(target, property, receiver);
-                  return isStaffSettingsShown();
-                }
+                if (property === "isDeveloper") return true;
                 return Reflect.get(target, property, receiver);
               }
             });
           }
         },
-        beforeAppRender({ cleanup, storage, revenge: { assets: assets2 } }) {
-          isStaffSettingsShown = () => storage[storageContextSymbol].ready ? storage.enabled : true;
-          cleanup(isStaffSettingsShown = () => originalValue, () => addTableRowsToAdvancedSectionInRevengePage(() => {
-            useObservable([
-              storage
-            ]);
-            return /* @__PURE__ */ jsx(TableSwitchRow, {
-              label: "Show Discord Staff Settings",
-              icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                source: assets2.getIndexByName("ic_progress_wrench_24px")
-              }),
-              value: storage.enabled,
-              onValueChange: (v2) => storage.enabled = v2
-            });
-          }));
-        },
-        initializeStorage: () => ({
-          enabled: false
-        })
+        beforeStop() {
+          return {
+            reloadRequired: true
+          };
+        }
       }, true, true);
     }
   });
@@ -3989,7 +4104,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       variant: DisplayableTypes.has(asset.type) ? "default" : "danger",
       label: asset.name,
       subLabel: `Index: ${index} \u2022 Type: ${asset.type} \u2022 ${!moduleId ? "Custom asset" : `Module ID: ${moduleId}`}`,
-      icon: DisplayableTypes.has(asset.type) ? /* @__PURE__ */ jsx(import_react_native6.Image, {
+      icon: DisplayableTypes.has(asset.type) ? /* @__PURE__ */ jsx(import_react_native7.Image, {
         source: index,
         style: {
           width: 32,
@@ -4004,7 +4119,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
         content: `Index: ${index}
 Module ID: ${moduleId ?? "(custom asset)"}
 Type: ${asset.type}`,
-        extraContent: DisplayableTypes.has(asset.type) ? /* @__PURE__ */ jsx(import_react_native6.Image, {
+        extraContent: DisplayableTypes.has(asset.type) ? /* @__PURE__ */ jsx(import_react_native7.Image, {
           resizeMode: "contain",
           source: index,
           style: {
@@ -4047,12 +4162,12 @@ Type: ${asset.type}`,
     toasts.open({
       key: "revenge.plugins.developer-settings.asset-browser.copied",
       content: "Copied to clipboard",
-      icon: getAssetIndexByName("toast_copy_link")
+      icon: icons_exports.CopyIcon
     });
   }
   function AssetBrowserSettingsPage() {
     var [search, setSearch] = (0, import_react4.useState)("");
-    return /* @__PURE__ */ jsxs(import_react_native6.View, {
+    return /* @__PURE__ */ jsxs(import_react_native7.View, {
       style: {
         gap: 16,
         paddingHorizontal: 16,
@@ -4088,7 +4203,7 @@ Type: ${asset.type}`,
       ]
     });
   }
-  var import_react4, import_react_native6, DisplayableTypes, UndisplayableTypesIconMap;
+  var import_react4, import_react_native7, DisplayableTypes, UndisplayableTypesIconMap;
   var init_AssetBrowser = __esm({
     "src/plugins/developer-settings/pages/AssetBrowser.tsx"() {
       "use strict";
@@ -4099,7 +4214,7 @@ Type: ${asset.type}`,
       init_metro();
       init_components2();
       import_react4 = __toESM(require_react(), 1);
-      import_react_native6 = __toESM(require_react_native(), 1);
+      import_react_native7 = __toESM(require_react_native(), 1);
       DisplayableTypes = /* @__PURE__ */ new Set([
         "png",
         "jpg",
@@ -4119,7 +4234,7 @@ Type: ${asset.type}`,
   // src/plugins/developer-settings/pages/DebugPerformanceTimes.tsx
   function DebugPerformanceTimesSettingsPage() {
     var previousTimestamp;
-    return /* @__PURE__ */ jsx(import_react_native7.ScrollView, {
+    return /* @__PURE__ */ jsx(import_react_native8.ScrollView, {
       children: /* @__PURE__ */ jsxs(PageWrapper, {
         children: [
           /* @__PURE__ */ jsx(Text, {
@@ -4147,14 +4262,14 @@ Type: ${asset.type}`,
       })
     });
   }
-  var import_react_native7, PerformanceTimesKeys;
+  var import_react_native8, PerformanceTimesKeys;
   var init_DebugPerformanceTimes = __esm({
     "src/plugins/developer-settings/pages/DebugPerformanceTimes.tsx"() {
       "use strict";
       init_react_jsx_runtime();
       init_src();
       init_components();
-      import_react_native7 = __toESM(require_react_native(), 1);
+      import_react_native8 = __toESM(require_react_native(), 1);
       init_Wrapper();
       PerformanceTimesKeys = Object.keys(PerformanceTimes).sort((a, b3) => timeOf(a) - timeOf(b3));
     }
@@ -4202,7 +4317,7 @@ Type: ${asset.type}`,
 
   // src/plugins/developer-settings/pages/Developer.tsx
   function DeveloperSettingsPage() {
-    var { storage, revenge: { assets: assets2, modules: modules2 } } = React.useContext(PluginContext);
+    var { storage, revenge: { assets: assets2, modules: modules3 } } = React.useContext(PluginContext);
     useObservable([
       storage
     ]);
@@ -4218,7 +4333,7 @@ Type: ${asset.type}`,
       DevToolsEvents.on("*", listener);
       return () => void DevToolsEvents.off("*", listener);
     }, []);
-    return /* @__PURE__ */ jsx(import_react_native8.ScrollView, {
+    return /* @__PURE__ */ jsx(import_react_native9.ScrollView, {
       children: /* @__PURE__ */ jsxs(PageWrapper, {
         children: [
           typeof __reactDevTools !== "undefined" && /* @__PURE__ */ jsxs(Stack, {
@@ -4295,7 +4410,7 @@ Type: ${asset.type}`,
                         /* @__PURE__ */ jsx(AlertActionButton, {
                           text: "Evaluate",
                           variant: "primary",
-                          onPress: () => alert(modules2.findProp("inspect")(
+                          onPress: () => alert(modules3.findProp("inspect")(
                             // biome-ignore lint/security/noGlobalEval: This is intentional
                             globalThis.eval(refEvalCode.current),
                             {
@@ -4386,7 +4501,7 @@ Type: ${asset.type}`,
                 source: assets2.getIndexByName("TrashIcon")
               }),
               onPress: () => {
-                modules2.metro.invalidateCache();
+                modules3.metro.invalidateCache();
                 BundleUpdaterManager.reload();
               }
             })
@@ -4395,7 +4510,7 @@ Type: ${asset.type}`,
       })
     });
   }
-  var import_react_native8;
+  var import_react_native9;
   var init_Developer = __esm({
     "src/plugins/developer-settings/pages/Developer.tsx"() {
       "use strict";
@@ -4408,7 +4523,7 @@ Type: ${asset.type}`,
       init_Wrapper();
       init_devtools();
       init_src7();
-      import_react_native8 = __toESM(require_react_native(), 1);
+      import_react_native9 = __toESM(require_react_native(), 1);
       init_developer_settings();
     }
   });
@@ -4510,7 +4625,7 @@ ${err.message}`
       init_common();
       init_native();
       init_internals();
-      MinimumSupportedBuildNumber = ReactNative2.Platform.select({
+      MinimumSupportedBuildNumber = ReactNative.Platform.select({
         android: 254e3,
         ios: 66559
       });
@@ -4522,8 +4637,8 @@ ${err.message}`
           id: "revenge.warnings",
           version: "1.0.0",
           icon: "WarningIcon",
-          afterAppRender({ revenge: { assets: assets2, modules: modules2 }, storage }) {
-            var { legacy_alerts: legacy_alerts2, toasts: toasts2 } = modules2.common;
+          afterAppRender({ revenge: { assets: assets2, modules: modules3 }, storage }) {
+            var { legacy_alerts: legacy_alerts2, toasts: toasts2 } = modules3.common;
             if ((storage.supportWarningDismissedAt ?? Date.now()) + 6048e5 > Date.now()) {
               legacy_alerts2.show({
                 title: "Support Warning",
@@ -4577,6 +4692,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   init_native();
   init_errors();
   init_src2();
+  Object.freeze = Object.seal = (o) => o;
   function initialize() {
     return _initialize.apply(this, arguments);
   }
@@ -4584,47 +4700,45 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     _initialize = // ! This function is BLOCKING, so we need to make sure it's as fast as possible
     _async_to_generator(function* () {
       recordTimestamp("Init_Initialize");
-      Object.freeze = Object.seal = (o) => o;
       try {
         var [{ createModulesLibrary: createModulesLibrary2 }, { SettingsUILibrary: SettingsUILibrary2 }] = yield Promise.all([
           Promise.resolve().then(() => (init_src3(), src_exports)),
           Promise.resolve().then(() => (init_settings(), settings_exports))
         ]);
         var ModulesLibraryPromise = createModulesLibrary2();
-        var [{ AppLibrary: AppLibrary2, errorBoundaryPatchedPromise: errorBoundaryPatchedPromise2 }, { AssetsLibrary: AssetsLibrary2 }, UIColorsLibrary] = yield Promise.all([
+        var [{ AppLibrary: AppLibrary2 }, { AssetsLibrary: AssetsLibrary2 }, UIColorsLibrary, { ReactJSXLibrary: ReactJSXLibrary2 }] = yield Promise.all([
           Promise.resolve().then(() => (init_src4(), src_exports2)),
           Promise.resolve().then(() => (init_src5(), src_exports3)),
-          Promise.resolve().then(() => (init_colors(), colors_exports))
+          Promise.resolve().then(() => (init_colors(), colors_exports)),
+          Promise.resolve().then(() => (init_jsx(), jsx_exports))
         ]);
         var ModulesLibrary = yield ModulesLibraryPromise;
-        var PreferencesLibrary = Promise.resolve().then(() => (init_src7(), src_exports5));
-        var [{ PluginsLibrary: PluginsLibrary2, startCorePlugins: startCorePlugins2, startPluginsMetroModuleSubscriptions: startCorePluginsMetroModuleSubscriptions }, { awaitStorage: awaitStorage2 }] = yield Promise.all([
+        var [{ PluginsLibrary: PluginsLibrary2, startCorePlugins: startCorePlugins2, startPluginsMetroModuleSubscriptions: startCorePluginsMetroModuleSubscriptions }, { awaitStorage: awaitStorage2 }, PreferencesLibrary] = yield Promise.all([
           Promise.resolve().then(() => (init_src8(), src_exports6)),
-          Promise.resolve().then(() => (init_src6(), src_exports4))
+          Promise.resolve().then(() => (init_src6(), src_exports4)),
+          Promise.resolve().then(() => (init_src7(), src_exports5))
         ]);
         globalThis.revenge = {
           app: AppLibrary2,
           assets: AssetsLibrary2,
           modules: ModulesLibrary,
           plugins: PluginsLibrary2,
+          react: {
+            jsx: ReactJSXLibrary2
+          },
           ui: {
             settings: SettingsUILibrary2,
             colors: UIColorsLibrary
           }
         };
-        var CorePlugins = Promise.resolve().then(() => (init_plugins(), plugins_exports)).then(() => {
-          recordTimestamp("Plugins_CoreImported");
-          startCorePluginsMetroModuleSubscriptions();
-        });
-        _async_to_generator(function* () {
-          if (ReactNative.Platform.OS !== "ios") yield errorBoundaryPatchedPromise2;
-          var { settings: settings2 } = yield PreferencesLibrary;
-          yield awaitStorage2(settings2);
-          recordTimestamp("Storage_Initialized");
-          yield CorePlugins;
-          yield startCorePlugins2();
-          recordTimestamp("Plugins_CoreStarted");
-        })();
+        yield Promise.resolve().then(() => (init_plugins(), plugins_exports));
+        recordTimestamp("Plugins_CoreImported");
+        var { settings: settings2, pluginsStates: pluginsStates2 } = yield PreferencesLibrary;
+        yield awaitStorage2(settings2, pluginsStates2);
+        recordTimestamp("Storage_Initialized");
+        startCorePluginsMetroModuleSubscriptions();
+        yield startCorePlugins2();
+        recordTimestamp("Plugins_CoreStarted");
       } catch (e) {
         onError(e);
       }
@@ -4640,8 +4754,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     ].join("\n"));
   }
   var requireFunc;
-  var initialized = false;
-  var patcher4 = createPatcherInstance("revenge.library.init");
+  var patcher5 = createPatcherInstance("revenge.library.init");
   var logger4 = createLogger("init");
   var ErrorTypeWhitelist = [
     ReferenceError,
@@ -4658,7 +4771,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     recordTimestamp("Native_RequiredIndex");
     var batchedBridge = __fbBatchedBridge;
     var callQueue = [];
-    var unpatch2 = patcher4.instead(batchedBridge, "callFunctionReturnFlushedQueue", (args, orig) => {
+    var unpatch2 = patcher5.instead(batchedBridge, "callFunctionReturnFlushedQueue", (args, orig) => {
       if (args[0] === "AppRegistry" || !batchedBridge.getCallableModule(args[0])) {
         callQueue.push(args);
         return batchedBridge.flushedQueue();
@@ -4678,10 +4791,8 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       set(metroRequire) {
         requireFunc = function patchedRequire(id) {
           if (id === IndexMetroModuleId) {
-            if (initialized) return;
-            initialized = true;
-            onceIndexRequired();
             requireFunc = metroRequire;
+            onceIndexRequired();
           } else return metroRequire(id);
         };
       }

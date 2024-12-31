@@ -156,15 +156,17 @@
   // libraries/modules/src/constants.ts
   var constants_exports = {};
   __export(constants_exports, {
+    FirstAssetTypeRegisteredKey: () => FirstAssetTypeRegisteredKey,
     IndexMetroModuleId: () => IndexMetroModuleId,
-    MetroCacheKey: () => MetroCacheKey,
+    MetroCacheRelativeFilePath: () => MetroCacheRelativeFilePath,
     MetroCacheVersion: () => MetroCacheVersion,
     MetroModuleFilePathKey: () => MetroModuleFilePathKey,
     MetroModuleFlags: () => MetroModuleFlags,
     MetroModuleLookupFlags: () => MetroModuleLookupFlags,
-    SafeModuleHookAmountBeforeDefer: () => SafeModuleHookAmountBeforeDefer
+    SafeModuleHookAmountBeforeDefer: () => SafeModuleHookAmountBeforeDefer,
+    assetCacheIndexSymbol: () => assetCacheIndexSymbol
   });
-  var MetroModuleFlags, MetroModuleLookupFlags, IndexMetroModuleId, SafeModuleHookAmountBeforeDefer, MetroCacheVersion, MetroCacheKey, MetroModuleFilePathKey;
+  var MetroModuleFlags, MetroModuleLookupFlags, IndexMetroModuleId, SafeModuleHookAmountBeforeDefer, MetroCacheVersion, MetroCacheRelativeFilePath, FirstAssetTypeRegisteredKey, MetroModuleFilePathKey, assetCacheIndexSymbol;
   var init_constants = __esm({
     "libraries/modules/src/constants.ts"() {
       "use strict";
@@ -173,9 +175,11 @@
       MetroModuleLookupFlags = createBitFlagEnum("NotFound", "FullLookup");
       IndexMetroModuleId = 0;
       SafeModuleHookAmountBeforeDefer = 1500;
-      MetroCacheVersion = 1;
-      MetroCacheKey = "RevengeMetroCache";
+      MetroCacheVersion = 2;
+      MetroCacheRelativeFilePath = "RevengeMetroCache";
+      FirstAssetTypeRegisteredKey = "__firstAssetTypeRegistered";
       MetroModuleFilePathKey = "__moduleFilePath";
+      assetCacheIndexSymbol = Symbol.for("revenge.modules.metro.caches.assetCacheIndex");
     }
   });
 
@@ -201,12 +205,12 @@
   function lazyDestructure(factory, opts = {}) {
     var proxiedObject = lazyValue(factory);
     return new Proxy({}, {
-      get(_2, property) {
+      get(_3, property) {
         if (property === Symbol.iterator) {
           return function* () {
             yield proxiedObject;
             yield new Proxy({}, {
-              get: (_3, p) => lazyValue(() => proxiedObject[p], opts)
+              get: (_4, p) => lazyValue(() => proxiedObject[p], opts)
             });
             throw new Error("This is not a real iterator, this is likely used incorrectly");
           };
@@ -374,8 +378,8 @@
             c: []
           };
           var replaceProxy = new Proxy(origFunc, {
-            apply: (_2, ctx, args) => runHook(ctx, args, false),
-            construct: (_2, args) => runHook(origFunc, args, true),
+            apply: (_3, ctx, args) => runHook(ctx, args, false),
+            construct: (_3, args) => runHook(origFunc, args, true),
             get: (target, prop, receiver) => prop == "toString" ? origFunc.toString.bind(origFunc) : Reflect.get(target, prop, receiver)
           });
           var runHook = (ctx, args, construct) => hook_default(replaceProxy, origFunc, args, ctx, construct);
@@ -937,8 +941,9 @@
     _restoreCache = _async_to_generator(function* () {
       logger.log("Attempting to restore cache...");
       resolveModuleDependencies(getMetroModules(), IndexMetroModuleId);
-      var savedCache = yield CacheModule.getItem(MetroCacheKey);
-      if (!savedCache) return false;
+      var path = `${FileModule.getConstants().CacheDirPath}/${MetroCacheRelativeFilePath}`;
+      if (!(yield FileModule.fileExists(path))) return false;
+      var savedCache = yield FileModule.readFile(path, "utf8");
       var storedCache = JSON.parse(savedCache);
       logger.log(`Cache found, validating... (compare: ${storedCache.v} === ${MetroCacheVersion}, ${storedCache.b} === ${ClientInfoModule.Build}, ${storedCache.t} === ${dependencies.size})`);
       if (storedCache.v !== MetroCacheVersion || storedCache.b !== ClientInfoModule.Build || storedCache.t !== dependencies.size) return false;
@@ -947,6 +952,8 @@
       cache.exportsFlags = storedCache.e;
       cache.lookupFlags = storedCache.l;
       cache.assetModules = storedCache.a;
+      cache.assets[assetCacheIndexSymbol] = {};
+      cache.assetModules[assetCacheIndexSymbol] = {};
       return true;
     });
     return _restoreCache.apply(this, arguments);
@@ -974,7 +981,7 @@
   function saveCache() {
     if (saveCacheDebounceTimeoutId) clearTimeout(saveCacheDebounceTimeoutId);
     saveCacheDebounceTimeoutId = setTimeout(() => {
-      CacheModule.setItem(MetroCacheKey, JSON.stringify({
+      FileModule.writeFile("cache", MetroCacheRelativeFilePath, JSON.stringify({
         v: MetroCacheVersion,
         b: ClientInfoModule.Build,
         t: cache.totalModules,
@@ -982,12 +989,12 @@
         l: cache.lookupFlags,
         a: cache.assetModules,
         p: cache.patchableModules
-      }));
+      }), "utf8");
       logger.log(`Cache saved (${cache.totalModules} modules)`);
     }, 1e3);
   }
   function invalidateCache() {
-    CacheModule.removeItem(MetroCacheKey);
+    FileModule.removeFile("cache", MetroCacheRelativeFilePath);
     logger.warn("Cache invalidated");
   }
   function cacherFor(key) {
@@ -1013,9 +1020,15 @@
   function cacheModuleAsBlacklisted(id) {
     cache.exportsFlags[id] |= MetroModuleFlags.Blacklisted;
   }
-  function cacheAsset(name, index, moduleId) {
-    cache.assets[name] = index;
-    cache.assetModules[name] = moduleId;
+  function cacheAsset(name, index, moduleId, type) {
+    cache.assets[name] ??= {};
+    cache.assetModules[name] ??= {
+      [FirstAssetTypeRegisteredKey]: type
+    };
+    cache.assets[name][type] = index;
+    cache.assetModules[name][type] ??= moduleId;
+    cache.assets[assetCacheIndexSymbol][index] = name;
+    cache.assetModules[assetCacheIndexSymbol][index] = cache.assetModules[name][type];
     cache.exportsFlags[moduleId] |= MetroModuleFlags.Asset;
     saveCache();
   }
@@ -1050,14 +1063,19 @@
          */
         lookupFlags: {},
         /**
-         * Registry for assets, the key being the name, and the value being the asset index
+         * Registry for assets, the key being the name, and the value being objects with the asset type as key and the index as value
          * #### This is in-memory.
          */
-        assets: {},
+        assets: {
+          [assetCacheIndexSymbol]: {}
+        },
         /**
-         * Registry for assets modules, the key being the name, and the value being the module ID of the module that registers the asset
+         * Registry for assets modules, the key being the name,
+         * and the value being objects with the asset type as key and the module ID of the module that registers the asset as value
          */
-        assetModules: {},
+        assetModules: {
+          [assetCacheIndexSymbol]: {}
+        },
         /**
          * Registry for patchable modules, the key being the patch, and the value being the module ID of the module to patch
          *
@@ -1101,7 +1119,7 @@
     });
     subscribePatchableModule("b", (exports, id) => {
       return exports.default?.reactProfilingEnabled && !metroModules[id + 1]?.publicModule.exports.default;
-    }, (_2, id) => {
+    }, (_3, id) => {
       if (!isModuleBlacklisted(id + 1)) {
         blacklistModule(id + 1);
         logger5.log(`Blacklisted module ${id + 1} as it causes freeze when initialized`);
@@ -1189,21 +1207,21 @@
     var unpatch2 = patcher.instead(metroModule, "factory", (args, origFunc) => {
       unpatch2();
       var originalImportingId = importingModuleId;
-      importingModuleId = id;
       var { 4: moduleObject } = args;
       try {
+        importingModuleId = id;
         origFunc(...args);
       } catch (error) {
         logger.log(`Blacklisted module ${id} because it could not be initialized: ${error}`);
         blacklistModule(id);
       }
+      importingModuleId = originalImportingId;
       if (isModuleExportsBad(moduleObject.exports)) blacklistModule(id);
       else {
         var subs2 = subscriptions[id];
         if (subs2) for (var sub2 of subs2) sub2(id, moduleObject.exports);
         for (var sub12 of subscriptions.all) sub12(id, moduleObject.exports);
       }
-      importingModuleId = originalImportingId;
     }, "moduleFactory");
     return true;
   }
@@ -1379,7 +1397,7 @@
     });
   }
   function createSimpleFilter(predicate, key) {
-    return createFilter((_2, m2) => predicate(m2), () => `dyn:${key}`)();
+    return createFilter((_3, m2) => predicate(m2), () => `dyn:${key}`)();
   }
   var init_filters = __esm({
     "libraries/modules/src/utils/filters.ts"() {
@@ -1417,7 +1435,7 @@
       byTypeName = createFilter(([typeName], m2) => m2.type?.name === typeName, (name) => `revenge.typeName(${name})`);
       byStoreName = createFilter(([name], m2) => m2.getName?.length === 0 && m2.getName() === name, (name) => `revenge.storeName(${name})`);
       modules2 = getMetroModules();
-      byFilePath = createFilter(([path, returnDefaultExport], _2, id, isDefaultExport) => {
+      byFilePath = createFilter(([path, returnDefaultExport], _3, id, isDefaultExport) => {
         return returnDefaultExport === isDefaultExport && modules2[id]?.[MetroModuleFilePathKey] === path;
       }, ([path, returnDefaultExport]) => `revenge.filePath(${path},${returnDefaultExport})`);
       bySingleProp = createFilter(([prop], m2) => m2[prop] && Object.keys(m2).length === 1, (prop) => `revenge.singleProp(${prop})`);
@@ -1436,19 +1454,23 @@
   // libraries/modules/src/common/components/icons.ts
   var icons_exports = {};
   __export(icons_exports, {
-    CopyIcon: () => CopyIcon
+    CheckmarkLargeIcon: () => CheckmarkLargeIcon,
+    CopyIcon: () => CopyIcon,
+    FolderIcon: () => FolderIcon
   });
   function wrapIcon(Comp) {
     return function IconElement(props) {
       return Comp(props ?? {});
     };
   }
-  var CopyIcon;
+  var CheckmarkLargeIcon, CopyIcon, FolderIcon;
   var init_icons = __esm({
     "libraries/modules/src/common/components/icons.ts"() {
       "use strict";
       init_finders();
+      CheckmarkLargeIcon = wrapIcon(findProp("CheckmarkLargeIcon"));
       CopyIcon = wrapIcon(findProp("CopyIcon"));
+      FolderIcon = wrapIcon(findProp("FolderIcon"));
     }
   });
 
@@ -1459,6 +1481,7 @@
     AlertModal: () => AlertModal,
     Button: () => Button,
     Card: () => Card,
+    ContextMenu: () => ContextMenu,
     FlashList: () => FlashList,
     FloatingActionButton: () => FloatingActionButton,
     FormCheckbox: () => FormCheckbox,
@@ -1490,7 +1513,7 @@
     TextInput: () => TextInput,
     TwinButtons: () => TwinButtons
   });
-  var SafeAreaProvider, SafeAreaView, TwinButtons, Button, IconButton, ImageButton, FloatingActionButton, RowButton, TableRow, TableSwitchRow, TableRowGroup, TableRowGroupTitle, TableRowIcon, TableRadioGroup, TableCheckboxRow, TableRadioRow, AlertModal, AlertActionButton, TextInput, TextField, TextArea, GhostInput, Card, Stack, Slider, Text, PressableScale, TableRowTrailingText, FormSwitch, FormRadio, FormCheckbox, FlashList, MasonryFlashList;
+  var SafeAreaProvider, SafeAreaView, TwinButtons, Button, IconButton, ImageButton, FloatingActionButton, RowButton, ContextMenu, TableRow, TableSwitchRow, TableRowGroup, TableRowGroupTitle, TableRowIcon, TableRadioGroup, TableCheckboxRow, TableRadioRow, AlertModal, AlertActionButton, TextInput, TextField, TextArea, GhostInput, Card, Stack, Slider, Text, PressableScale, TableRowTrailingText, FormSwitch, FormRadio, FormCheckbox, FlashList, MasonryFlashList;
   var init_components = __esm({
     "libraries/modules/src/common/components/index.ts"() {
       "use strict";
@@ -1508,6 +1531,10 @@
         ImageButton,
         FloatingActionButton,
         RowButton,
+        ContextMenu: (
+          // Context Menus
+          ContextMenu
+        ),
         TableRow: (
           // Tables
           TableRow
@@ -1611,8 +1638,9 @@
     NavigationStack: () => NavigationStack,
     React: () => React2,
     ReactJSXRuntime: () => ReactJSXRuntime,
-    ReactNative: () => ReactNative,
+    ReactNative: () => ReactNative2,
     TextStyleSheet: () => TextStyleSheet,
+    _: () => _,
     alerts: () => alerts,
     assetsRegistry: () => assetsRegistry,
     channels: () => channels,
@@ -1622,6 +1650,7 @@
     constants: () => constants,
     createStyles: () => createStyles,
     dismissAlerts: () => dismissAlerts,
+    filePicker: () => filePicker,
     intl: () => intl,
     intlModule: () => intlModule,
     invites: () => invites,
@@ -1636,7 +1665,7 @@
     tokens: () => tokens,
     xxhash64: () => xxhash64
   });
-  var constants, tokens, intl, intlModule, Logger, legacy_alerts, alerts, channels, links, clipboard, invites, commands, toasts, messages, NavigationStack, NavigationNative, TextStyleSheet, createStyles, dismissAlerts, openAlert, Flux, FluxDispatcher, assetsRegistry, React2, ReactNative, ReactJSXRuntime, semver, xxhash64, nobleHashesUtils;
+  var constants, tokens, intl, intlModule, Logger, legacy_alerts, alerts, channels, links, clipboard, invites, commands, toasts, filePicker, messages, NavigationStack, NavigationNative, TextStyleSheet, createStyles, dismissAlerts, openAlert, Flux, FluxDispatcher, assetsRegistry, React2, ReactNative2, ReactJSXRuntime, semver, xxhash64, nobleHashesUtils, _;
   var init_common = __esm({
     "libraries/modules/src/common/index.ts"() {
       "use strict";
@@ -1654,11 +1683,12 @@
       legacy_alerts = findByProps("openLazy", "close");
       alerts = findByProps("openAlert", "dismissAlert");
       channels = findByProps("getVoiceChannelId");
-      links = findByProps("openDeepLink");
+      links = findByProps("openURL", "openDeeplink");
       clipboard = findByProps("getImagePNG");
       invites = findByProps("createInvite");
       commands = findByProps("getBuiltInCommands");
       toasts = findByFilePath("modules/toast/native/ToastActionCreators.tsx", true);
+      filePicker = findByProps("handleDocumentSelection");
       messages = findByProps("sendBotMessage");
       NavigationStack = findByProps("createStackNavigator");
       NavigationNative = findByProps("NavigationContainer");
@@ -1666,11 +1696,12 @@
       Flux = findByProps("connectStores");
       FluxDispatcher = findByProps("_interceptors");
       assetsRegistry = findByProps("registerAsset");
-      ({ React: React2, ReactNative } = lazyDestructure(() => globalThis));
+      ({ React: React2, ReactNative: ReactNative2 } = lazyDestructure(() => globalThis));
       ReactJSXRuntime = findByProps("jsx", "jsxs");
       semver = findByProps("SEMVER_SPEC_VERSION");
       xxhash64 = findByProps("XXH64");
       nobleHashesUtils = findByProps("randomBytes");
+      _ = findByProps("cloneDeep");
     }
   });
 
@@ -1725,12 +1756,12 @@
     customData.rows[key] = route;
     return () => delete customData.rows[key];
   }
-  function addSettingsRowsToSection(name, rows2) {
+  function addSettingsRowsToSection(name, rows) {
     if (!(name in customData.sections)) throw new Error(`No setting section exists with the name "${name}"`);
     var section = customData.sections[name];
-    Object.assign(section.settings, rows2);
+    Object.assign(section.settings, rows);
     return () => {
-      for (var key in rows2) delete section.settings[key];
+      for (var key in rows) delete section.settings[key];
     };
   }
   var customData, SettingsUILibrary;
@@ -1782,6 +1813,13 @@
     }
   });
 
+  // globals:react-native
+  var require_react_native = __commonJS({
+    "globals:react-native"(exports, module) {
+      module.exports = (init_deps(), __toCommonJS(deps_exports)).default["react-native"];
+    }
+  });
+
   // libraries/react/src/jsx.ts
   var jsx_exports = {};
   __export(jsx_exports, {
@@ -1791,28 +1829,53 @@
     isNativeJSXElement: () => isNativeJSXElement
   });
   function afterJSXElementCreate(elementName, callback) {
-    if (!(elementName in afterCallbacks)) afterCallbacks[elementName] = /* @__PURE__ */ new Set();
-    afterCallbacks[elementName].add(callback);
+    patchJsxRuntimeIfNotPatched();
+    var set = afterCallbacks[elementName] ??= /* @__PURE__ */ new Set();
+    set.add(callback);
+    return () => {
+      set.delete(callback);
+      unpatchIfNoListenersLeft();
+    };
   }
   function beforeJSXElementCreate(elementName, callback) {
-    if (!(elementName in beforeCallbacks)) beforeCallbacks[elementName] = /* @__PURE__ */ new Set();
-    beforeCallbacks[elementName].add(callback);
+    patchJsxRuntimeIfNotPatched();
+    var set = beforeCallbacks[elementName] ??= /* @__PURE__ */ new Set();
+    set.add(callback);
+    return () => {
+      set.delete(callback);
+      unpatchIfNoListenersLeft();
+    };
   }
   function isNativeJSXElement(element) {
     return typeof element === "string";
   }
-  var beforeCallbacks, afterCallbacks, patchCallback, ReactJSXLibrary;
+  var import_react_native, styles, patched, persistentPatch, beforeCallbacks, afterCallbacks, patchCallback, patchJsxRuntimeIfNotPatched, unpatchIfNoListenersLeft, ReactJSXLibrary;
   var init_jsx = __esm({
     "libraries/react/src/jsx.ts"() {
       "use strict";
       init_common();
       init_shared2();
+      import_react_native = __toESM(require_react_native(), 1);
+      styles = import_react_native.StyleSheet.create({
+        hidden: {
+          display: "none"
+        }
+      });
+      patched = false;
+      persistentPatch = import_react_native.Platform.OS === "ios";
       beforeCallbacks = {};
       afterCallbacks = {};
       patchCallback = (args, orig) => {
         var [Comp, props] = args;
-        var name = typeof Comp === "string" ? Comp : Comp.name ?? // @ts-expect-error
-        (typeof Comp.type === "string" ? Comp.type : Comp.type?.name) ?? Comp.displayName;
+        if (typeof (Comp?.type ?? Comp) === "undefined") {
+          args[0] = "RCTView";
+          args[1] = {
+            style: styles.hidden
+          };
+          return orig.apply(ReactJSXRuntime, args);
+        }
+        var name = typeof Comp === "string" ? Comp : Comp?.name ?? // @ts-expect-error
+        (typeof Comp?.type === "string" ? Comp.type : Comp?.type?.name) ?? Comp?.displayName;
         if (!name) return orig.apply(ReactJSXRuntime, args);
         var newArgs = args;
         if (name in beforeCallbacks) for (var cb of beforeCallbacks[name]) {
@@ -1828,10 +1891,19 @@
         }
         return tree;
       };
-      setTimeout(() => {
+      setTimeout(() => persistentPatch && patchJsxRuntimeIfNotPatched());
+      patchJsxRuntimeIfNotPatched = () => {
+        if (patched) return;
+        patched = true;
         patcher2.instead(ReactJSXRuntime, "jsx", patchCallback, "patchJsxRuntime");
         patcher2.instead(ReactJSXRuntime, "jsxs", patchCallback, "patchJsxRuntime");
-      });
+      };
+      unpatchIfNoListenersLeft = () => {
+        if (persistentPatch) return;
+        if (Object.values(beforeCallbacks).some((set) => set.size) || Object.values(afterCallbacks).some((set) => set.size)) return;
+        patcher2.unpatchAll();
+        patched = false;
+      };
       ReactJSXLibrary = {
         beforeElementCreate: beforeJSXElementCreate,
         afterElementCreate: afterJSXElementCreate,
@@ -1866,13 +1938,6 @@
     }
   });
 
-  // globals:react-native
-  var require_react_native = __commonJS({
-    "globals:react-native"(exports, module) {
-      module.exports = (init_deps(), __toCommonJS(deps_exports)).default["react-native"];
-    }
-  });
-
   // libraries/app/src/components/ErrorBoundaryScreen.tsx
   var ErrorBoundaryScreen_exports = {};
   __export(ErrorBoundaryScreen_exports, {
@@ -1885,7 +1950,7 @@
     return /* @__PURE__ */ jsxs(SafeAreaView, {
       style: errorBoundaryStyles.view,
       children: [
-        /* @__PURE__ */ jsxs(import_react_native.View, {
+        /* @__PURE__ */ jsxs(import_react_native2.View, {
           style: {
             gap: 4
           },
@@ -1916,7 +1981,7 @@
                 ") \u2022 Revenge ",
                 "local",
                 " (",
-                "91dc2e9",
+                "b7729c0",
                 false ? "-dirty" : "",
                 ")"
               ]
@@ -1937,8 +2002,8 @@
                   variant: "heading-xl/semibold",
                   children: "Call Stack"
                 }),
-                /* @__PURE__ */ jsx(import_react_native.ScrollView, {
-                  style: styles.scrollView,
+                /* @__PURE__ */ jsx(import_react_native2.ScrollView, {
+                  style: styles2.scrollView,
                   fadingEdgeLength: 64,
                   children: parseStackTrace(error.stack?.slice(String(error).length + 1)).map(({ at, file, line, column }) => (
                     // biome-ignore lint/correctness/useJsxKeyInIterable: This never gets rerendered
@@ -1980,7 +2045,7 @@
         error instanceof Error && "componentStack" in error && /* @__PURE__ */ jsx(LabeledCard, {
           scrollable: true,
           label: "Component Stack",
-          style: styles.resizable,
+          style: styles2.resizable,
           rawContent: error.componentStack,
           children: /* @__PURE__ */ jsx(Text, {
             selectable: true,
@@ -2002,13 +2067,13 @@
           spacing: 16,
           children: [
             /* @__PURE__ */ jsx(Button, {
-              style: styles.growable,
+              style: styles2.growable,
               variant: "destructive",
               text: "Reload Discord",
               onPress: props.reload
             }),
             /* @__PURE__ */ jsx(Button, {
-              style: styles.growable,
+              style: styles2.growable,
               text: "Retry Render",
               onPress: props.rerender
             })
@@ -2018,17 +2083,17 @@
     });
   }
   function LabeledCard(props) {
-    var ViewComponent = props.scrollable ? import_react_native.ScrollView : import_react_native.View;
+    var ViewComponent = props.scrollable ? import_react_native2.ScrollView : import_react_native2.View;
     return /* @__PURE__ */ jsxs(Card, {
       ...props,
       style: [
-        styles.scrollView,
+        styles2.scrollView,
         ...Array.isArray(props.style) ? props.style : [
           props.style
         ]
       ],
       children: [
-        /* @__PURE__ */ jsxs(import_react_native.View, {
+        /* @__PURE__ */ jsxs(import_react_native2.View, {
           style: {
             flexDirection: "row",
             alignItems: "center"
@@ -2036,7 +2101,7 @@
           children: [
             /* @__PURE__ */ jsx(Text, {
               variant: "heading-xl/semibold",
-              style: styles.growable,
+              style: styles2.growable,
               children: props.label
             }),
             props.rawContent && /* @__PURE__ */ jsx(Button, {
@@ -2048,7 +2113,7 @@
           ]
         }),
         /* @__PURE__ */ jsx(ViewComponent, {
-          style: styles.scrollView,
+          style: styles2.scrollView,
           fadingEdgeLength: 32,
           children: props.children
         })
@@ -2092,7 +2157,7 @@
     }
     return frames;
   }
-  var import_react_native, useErrorBoundaryStyles, styles, IndexBundleFilePath, StackFrameRegex;
+  var import_react_native2, useErrorBoundaryStyles, styles2, IndexBundleFilePath, StackFrameRegex;
   var init_ErrorBoundaryScreen = __esm({
     "libraries/app/src/components/ErrorBoundaryScreen.tsx"() {
       "use strict";
@@ -2102,7 +2167,7 @@
       init_native();
       init_colors();
       init_errors();
-      import_react_native = __toESM(require_react_native(), 1);
+      import_react_native2 = __toESM(require_react_native(), 1);
       useErrorBoundaryStyles = createStyles({
         view: {
           backgroundColor: SemanticColor.BG_BASE_SECONDARY,
@@ -2112,7 +2177,7 @@
           gap: 16
         }
       });
-      styles = import_react_native.StyleSheet.create({
+      styles2 = import_react_native2.StyleSheet.create({
         scrollView: {
           gap: 8,
           flex: 1
@@ -2168,7 +2233,7 @@
       isAppRendered = false;
       afterAppInitialize(() => isAppInitialized = true);
       afterAppRender(() => isAppRendered = true);
-      unpatchRunApplication = patcher3.after(ReactNative.AppRegistry, "runApplication", () => {
+      unpatchRunApplication = patcher3.after(ReactNative2.AppRegistry, "runApplication", () => {
         unpatchRunApplication();
         recordTimestamp("App_RunApplicationCalled");
         logger2.log("AppRegistry.runApplication called");
@@ -2184,10 +2249,10 @@
         recordTimestamp("App_AfterRunCECallbacks");
         logger2.log("Rendered callbacks called");
       }, "runRenderCallbacks");
-      afterErrorBoundaryPatchable = ReactNative.Platform.OS === "ios" ? afterAppRender : afterAppInitialize;
+      afterErrorBoundaryPatchable = ReactNative2.Platform.OS === "ios" ? afterAppRender : afterAppInitialize;
       afterErrorBoundaryPatchable(/* @__PURE__ */ function() {
         var _patchErrorBoundary = _async_to_generator(function* () {
-          if (ReactNative.Platform.OS === "ios") ReactJSXLibrary.afterElementCreate("PortalKeyboardPlaceholderInner", () => null);
+          if (ReactNative2.Platform.OS === "ios") ReactJSXLibrary.afterElementCreate("PortalKeyboardPlaceholderInner", () => null);
           var { default: Screen } = yield Promise.resolve().then(() => (init_ErrorBoundaryScreen(), ErrorBoundaryScreen_exports));
           setImmediate(() => {
             patcher3.after.await(findByName.async("ErrorBoundary").then((it) => it.prototype), "render", function() {
@@ -2247,8 +2312,14 @@
     getAssetByIndex: () => getAssetByIndex,
     getAssetByName: () => getAssetByName,
     getAssetIndexByName: () => getAssetIndexByName,
+    getAssetModuleIdByIndex: () => getAssetModuleIdByIndex,
+    getAssetModuleIdByName: () => getAssetModuleIdByName,
+    getAssetTypesByIndex: () => getAssetTypesByIndex,
+    getAssetTypesByName: () => getAssetTypesByName,
+    getFirstRegisteredAssetTypeByName: () => getFirstRegisteredAssetTypeByName,
     isCustomAsset: () => isCustomAsset,
-    registerCustomAsset: () => registerCustomAsset
+    registerCustomAsset: () => registerCustomAsset,
+    setDefaultPreferredAssetType: () => setDefaultPreferredAssetType
   });
   function maybeResolveCustomAsset(args, orig) {
     if (CustomAssetBrandKey in this.asset) return {
@@ -2257,6 +2328,7 @@
     return orig.apply(this, args);
   }
   function registerCustomAsset(asset, source) {
+    if (asset.name in customAssets) throw new Error("Custom asset with the same name already exists, and registering multiple custom assets with the same name is not supported yet");
     return customAssets[asset.name] = assetsRegistry.registerAsset({
       ...asset,
       __packager_asset: true,
@@ -2271,19 +2343,42 @@
   function isCustomAsset(asset) {
     return CustomAssetBrandKey in asset;
   }
-  function getAssetByName(name) {
-    return getAssetByIndex(customAssets[name] ?? cache.assets[name]);
+  function getAssetByName(name, preferredType = defaultPreferredType) {
+    if (name in customAssets) return getAssetByIndex(customAssets[name]);
+    return getAssetByIndex(getAssetIndexByName(name, preferredType));
   }
   function getAssetByIndex(index) {
     return assetsIndex[index];
   }
-  function getAssetIndexByName(name) {
+  function getAssetIndexByName(name, preferredType = defaultPreferredType) {
     if (name in customAssets) return customAssets[name];
-    var moduleId = cache.assetModules[name];
-    if (!moduleId) return;
-    return cache.assets[name] ??= requireModule(moduleId);
+    var assetModule = cache.assetModules[name];
+    if (!assetModule) return;
+    var mid = assetModule[preferredType] ?? assetModule[getFirstRegisteredAssetTypeByName(name)];
+    if (typeof mid === "undefined") return;
+    return requireModule(mid);
   }
-  var patcher4, CustomAssetBrandKey, customAssets, AssetSourceResolver, assetsIndex, AssetsLibrary;
+  function getAssetModuleIdByName(name, preferredType = defaultPreferredType) {
+    var moduleIds = cache.assetModules[name];
+    if (!moduleIds) return;
+    return moduleIds[preferredType] ?? moduleIds[getFirstRegisteredAssetTypeByName(name)];
+  }
+  function getAssetModuleIdByIndex(index) {
+    return cache.assetModules[assetCacheIndexSymbol][index];
+  }
+  function getAssetTypesByName(name, preferredType = defaultPreferredType) {
+    return getAssetTypesByIndex(getAssetIndexByName(name, preferredType));
+  }
+  function getAssetTypesByIndex(index) {
+    return Object.keys(cache.assetModules[assetCacheIndexSymbol][index] ?? {});
+  }
+  function getFirstRegisteredAssetTypeByName(name) {
+    return cache.assetModules[name]?.[FirstAssetTypeRegisteredKey];
+  }
+  function setDefaultPreferredAssetType(type) {
+    defaultPreferredType = type;
+  }
+  var patcher4, CustomAssetBrandKey, customAssets, defaultPreferredType, AssetSourceResolver, assetsIndex, AssetsLibrary;
   var init_src5 = __esm({
     "libraries/assets/src/index.ts"() {
       "use strict";
@@ -2291,13 +2386,15 @@
       init_finders();
       init_metro();
       init_src2();
+      init_constants();
       patcher4 = createPatcherInstance("revenge.library.assets");
       CustomAssetBrandKey = "__revenge_asset";
       customAssets = {};
+      defaultPreferredType = ReactNative.Platform.OS === "ios" ? "png" : "svg";
       patcher4.after(assetsRegistry, "registerAsset", ([asset], index) => {
         if (CustomAssetBrandKey in asset) return;
         var moduleId = getImportingModuleId();
-        cacheAsset(asset.name, index, moduleId);
+        cacheAsset(asset.name, index, moduleId, asset.type);
       }, "patchRegisterAsset");
       AssetSourceResolver = findByName.async("AssetSourceResolver").then((it) => it.prototype);
       patcher4.instead.await(AssetSourceResolver, "defaultAsset", maybeResolveCustomAsset);
@@ -2313,8 +2410,28 @@
         registerCustom: registerCustomAsset,
         getByName: getAssetByName,
         getIndexByName: getAssetIndexByName,
-        getByIndex: getAssetByIndex
+        getByIndex: getAssetByIndex,
+        getModuleIdByName: getAssetModuleIdByName,
+        getModuleIdByIndex: getAssetModuleIdByIndex,
+        getTypesByName: getAssetTypesByName,
+        getTypesByIndex: getAssetTypesByIndex,
+        setDefaultPreferredType: setDefaultPreferredAssetType
       };
+    }
+  });
+
+  // libraries/shared/src/paths.ts
+  var BaseDirectory, SettingsFilePath, TrustedKeysDirectoryPath, TrustedKeysDataFilePath, PluginsDirectoryPath, PluginsStatesFilePath, PluginStoragePath;
+  var init_paths = __esm({
+    "libraries/shared/src/paths.ts"() {
+      "use strict";
+      BaseDirectory = "revenge";
+      SettingsFilePath = `${BaseDirectory}/settings.json`;
+      TrustedKeysDirectoryPath = `${BaseDirectory}/trusted_keys`;
+      TrustedKeysDataFilePath = `${TrustedKeysDirectoryPath}/data.json`;
+      PluginsDirectoryPath = `${BaseDirectory}/plugins`;
+      PluginsStatesFilePath = `${PluginsDirectoryPath}/states.json`;
+      PluginStoragePath = (id) => `${PluginsDirectoryPath}/${id}/storage.json`;
     }
   });
 
@@ -2335,7 +2452,7 @@
     try {
       var result = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function() {
       }));
-    } catch (_2) {
+    } catch (_3) {
     }
     return (_is_native_reflect_construct = function _is_native_reflect_construct2() {
       return !!result;
@@ -2454,7 +2571,7 @@
   });
 
   // node_modules/@gullerya/object-observer/dist/object-observer.min.js
-  var m, x, E, T, K, c, $, N, Y, I, B, D, R, z, y, g, q, H, G, J, F, P, L, C, Q, X, Z, _, b, S, V, U, W, v;
+  var m, x, E, T, K, c, $, N, Y, I, B, D, R, z, y, g, q, H, G, J, F, P, L, C, Q, X, Z, _2, b, S, V, U, W, v;
   var init_object_observer_min = __esm({
     "node_modules/@gullerya/object-observer/dist/object-observer.min.js"() {
       init_call_super();
@@ -2713,7 +2830,7 @@
         copyWithin: C,
         splice: Q
       };
-      _ = {
+      _2 = {
         reverse: F,
         sort: P,
         fill: L,
@@ -2841,7 +2958,7 @@
           {
             key: "get",
             value: function get(t, e) {
-              return _[e] || t[e];
+              return _2[e] || t[e];
             }
           }
         ]);
@@ -3013,11 +3130,11 @@
     return new Proxy({}, {
       ...Object.fromEntries(Object.getOwnPropertyNames(Reflect).map((k) => [
         k,
-        (_2, ...args) => {
+        (_3, ...args) => {
           return check() && Reflect[k](proxy, ...args);
         }
       ])),
-      get(_2, prop, recv) {
+      get(_3, prop, recv) {
         if (prop === storageContextSymbol) return context;
         return check() && Reflect.get(proxy, prop, recv);
       }
@@ -3077,8 +3194,9 @@
   var init_src7 = __esm({
     "libraries/preferences/src/index.ts"() {
       "use strict";
+      init_paths();
       init_src6();
-      settings = createStorage("revenge/settings.json", {
+      settings = createStorage(SettingsFilePath, {
         initial: {
           safeMode: {
             enabled: false,
@@ -3086,7 +3204,7 @@
           }
         }
       });
-      pluginsStates = createStorage("revenge/plugins/states.json", {
+      pluginsStates = createStorage(PluginsStatesFilePath, {
         initial: {}
       });
     }
@@ -3125,28 +3243,42 @@
     if (!PluginIdRegex.test(definition.id)) throw new Error(`Cannot register plugin "${definition.id}", invalid ID format`);
     var prepareStorageAndPatcher = () => {
       instance.patcher ||= createPatcherInstance(`revenge.plugins.plugin#${definition.id}`);
-      instance.storage ||= createStorage(`revenge/plugins/${definition.id}/storage.json`, {
+      instance.storage ||= createStorage(PluginStoragePath(definition.id), {
         initial: definition.initializeStorage?.() ?? {}
       });
     };
+    var status = PluginStatus.Stopped;
+    var startedStatus = definition.beforeAppRender || definition.afterAppRender ? PluginStatus.Started : PluginStatus.StartedEarly;
     var internalPlugin = objectSeal({
       ...definition,
+      state: lazyValue(() => (
+        // Manageable?
+        // - Yes: Check preferences, default to false if it doesn't exist
+        // - No: Check predicate, default to if core
+        pluginsStates[definition.id] ??= {
+          enabled: manageable ? false : predicate?.() ?? core,
+          errors: []
+        }
+      )),
       get enabled() {
-        return manageable ? pluginsStates[definition.id]?.enabled ?? false : predicate?.() ?? core;
+        return this.state.enabled;
       },
       set enabled(val) {
         if (!manageable) throw new Error(`Cannot enable/disable unmanageable plugin: ${this.id}`);
-        if (definition.id in pluginsStates) pluginsStates[definition.id].enabled = val;
-        else pluginsStates[definition.id] = {
-          enabled: val
-        };
+        this.state.enabled = val;
       },
       get stopped() {
         return this.status === PluginStatus.Stopped || this.status === PluginStatus.StartedEarly;
       },
       core,
       manageable,
-      status: PluginStatus.Stopped,
+      get status() {
+        return status;
+      },
+      set status(val) {
+        status = val;
+        if (val === startedStatus) this.state.errors = [];
+      },
       SettingsComponent: definition.settings,
       errors: [],
       disable() {
@@ -3220,6 +3352,7 @@
           }));
         }
         if (this.errors.length) {
+          this.state.errors.push(...this.errors);
           var msg = `Plugin "${this.id}" encountered ${this.errors.length} errors
 ${this.errors.map(getErrorStack).join("\n")}`;
           logger3.error(msg);
@@ -3277,6 +3410,7 @@ ${this.errors.map(getErrorStack).join("\n")}`;
       init_src7();
       init_src2();
       init_src6();
+      init_paths();
       init_errors();
       init_functions();
       init_lazy();
@@ -3295,22 +3429,21 @@ ${this.errors.map(getErrorStack).join("\n")}`;
   // libraries/plugins/src/index.ts
   var src_exports6 = {};
   __export(src_exports6, {
-    PluginsLibrary: () => PluginsLibrary,
-    definePlugin: () => definePlugin,
+    installPlugin: () => installPlugin,
     startCorePlugins: () => startCorePlugins,
     startPluginsMetroModuleSubscriptions: () => startPluginsMetroModuleSubscriptions
   });
-  function definePlugin(definition) {
-    return registerPlugin(definition);
+  function installPlugin() {
+    throw new Error("Not implemented");
   }
   function startCorePlugins() {
     logger3.info("Starting core plugins lifecycles...");
     var promises = [];
     var errors = [];
     for (var id of corePluginIds) {
-      var plugin2 = plugins[id];
-      if (!plugin2.enabled) continue;
-      promises.push(plugin2.start().catch((e) => errors.push(e)));
+      var plugin3 = plugins[id];
+      if (!plugin3.enabled) continue;
+      promises.push(plugin3.start().catch((e) => errors.push(e)));
     }
     return new Promise((resolve, reject) => {
       Promise.all(promises).then(() => errors.length ? reject(new AggregateError(errors, `${errors.length} core plugins encountered errors:
@@ -3319,9 +3452,8 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
   }
   function startPluginsMetroModuleSubscriptions() {
     logger3.info("Starting Metro module subscriptions for plugins...");
-    for (var plugin2 of Object.values(plugins)) plugin2.startMetroModuleSubscriptions();
+    for (var plugin3 of Object.values(plugins)) plugin3.startMetroModuleSubscriptions();
   }
-  var PluginsLibrary;
   var init_src8 = __esm({
     "libraries/plugins/src/index.ts"() {
       "use strict";
@@ -3332,14 +3464,6 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       afterAppRender(() => {
         for (var cb of appRenderedCallbacks) cb();
       });
-      PluginsLibrary = {
-        /**
-         * Defines a plugin
-         * @param definition The plugin definition
-         * @returns The plugin object
-         */
-        definePlugin
-      };
     }
   });
 
@@ -3462,31 +3586,31 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
 
   // src/plugins/settings/pages/(Wrapper).tsx
   function PageWrapper(props) {
-    return /* @__PURE__ */ jsx(import_react_native2.View, {
-      style: styles2.growable,
-      children: /* @__PURE__ */ jsx(import_react_native2.ScrollView, {
+    return /* @__PURE__ */ jsx(import_react_native3.View, {
+      style: styles3.growable,
+      children: /* @__PURE__ */ jsx(import_react_native3.ScrollView, {
         keyboardShouldPersistTaps: "handled",
-        contentContainerStyle: styles2.resizable,
+        contentContainerStyle: styles3.resizable,
         children: /* @__PURE__ */ jsx(Stack, {
           style: [
-            styles2.paddedContainer,
-            styles2.resizable
+            props.withTopControls ? styles3.paddedContainerTopControls : styles3.paddedContainer,
+            styles3.resizable
           ],
-          spacing: 16,
+          spacing: 28,
           direction: "vertical",
           children: props.children
         })
       })
     });
   }
-  var import_react_native2, styles2;
+  var import_react_native3, styles3;
   var init_Wrapper = __esm({
     "src/plugins/settings/pages/(Wrapper).tsx"() {
       "use strict";
       init_react_jsx_runtime();
       init_components();
-      import_react_native2 = __toESM(require_react_native(), 1);
-      styles2 = import_react_native2.StyleSheet.create({
+      import_react_native3 = __toESM(require_react_native(), 1);
+      styles3 = import_react_native3.StyleSheet.create({
         growable: {
           flexGrow: 1
         },
@@ -3495,7 +3619,11 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
         },
         paddedContainer: {
           paddingHorizontal: 16,
-          paddingTop: 16
+          paddingTop: 24
+        },
+        paddedContainerTopControls: {
+          paddingTop: 12,
+          paddingHorizontal: 16
         }
       });
     }
@@ -3504,7 +3632,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
   // src/plugins/settings/pages/About.tsx
   function AboutSettingsPage() {
     var runtimeProps = HermesInternal.getRuntimeProperties();
-    return /* @__PURE__ */ jsx(import_react_native3.ScrollView, {
+    return /* @__PURE__ */ jsx(import_react_native4.ScrollView, {
       children: /* @__PURE__ */ jsxs(PageWrapper, {
         children: [
           /* @__PURE__ */ jsx(TableRowGroup, {
@@ -3512,12 +3640,12 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
             children: [
               {
                 label: "Revenge",
-                icon: assets.getIndexByName("Revenge.RevengeIcon"),
-                trailing: `${"local"} (${"91dc2e9"}${false ? "-dirty" : ""})`
+                icon: "Revenge.RevengeIcon",
+                trailing: `${"local"} (${"b7729c0"}${false ? "-dirty" : ""})`
               },
               {
                 label: "Discord",
-                icon: assets.getIndexByName("Discord"),
+                icon: "Discord",
                 trailing: `${ClientInfoModule.Version} (${ClientInfoModule.Build})`
               }
             ].map((props) => (
@@ -3532,17 +3660,17 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
             children: [
               {
                 label: "React",
-                icon: assets.getIndexByName("Revenge.ReactIcon"),
+                icon: "Revenge.ReactIcon",
                 trailing: React.version
               },
               {
                 label: "React Native",
-                icon: assets.getIndexByName("Revenge.ReactIcon"),
+                icon: "Revenge.ReactIcon",
                 trailing: runtimeProps["OSS Release Version"].slice(7)
               },
               {
                 label: "Hermes Bytecode",
-                icon: assets.getIndexByName("Revenge.HermesIcon"),
+                icon: "Revenge.HermesIcon",
                 trailing: `${runtimeProps["Bytecode Version"]} (${runtimeProps.Build})`
               }
             ].map((props) => (
@@ -3560,7 +3688,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
     return /* @__PURE__ */ jsx(TableRow, {
       label: props.label,
       icon: /* @__PURE__ */ jsx(TableRowIcon, {
-        source: props.icon
+        source: getAssetIndexByName(props.icon)
       }),
       trailing: /* @__PURE__ */ jsx(TableRowTrailingText, {
         text: props.trailing
@@ -3575,17 +3703,145 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       }
     });
   }
-  var import_react_native3, assets;
+  var import_react_native4;
   var init_About = __esm({
     "src/plugins/settings/pages/About.tsx"() {
       "use strict";
       init_react_jsx_runtime();
+      init_src5();
       init_common();
       init_components();
       init_native();
-      import_react_native3 = __toESM(require_react_native(), 1);
       init_Wrapper();
-      ({ assets } = revenge);
+      import_react_native4 = __toESM(require_react_native(), 1);
+    }
+  });
+
+  // src/plugins/settings/contributors.ts
+  var contributors_default;
+  var init_contributors = __esm({
+    "src/plugins/settings/contributors.ts"() {
+      "use strict";
+      contributors_default = {
+        team: [
+          {
+            name: "Palm",
+            url: "https://palmdevs.me",
+            icon: "https://github.com/PalmDevs.png",
+            roles: [
+              "Founder",
+              "Lead Developer"
+            ]
+          },
+          {
+            name: "oSumAtrIX",
+            url: "https://osumatrix.me",
+            icon: "https://github.com/oSumAtrIX.png",
+            roles: [
+              "Project Manager",
+              "Android Development"
+            ]
+          }
+        ],
+        contributors: [
+          {
+            name: "Marsh",
+            icon: "https://github.com/marshift.png",
+            url: "https://marsh.zone",
+            roles: [
+              "Collaborator"
+            ]
+          },
+          {
+            name: "Cristian",
+            icon: "https://github.com/Cristiandis.png",
+            url: "https://github.com/Cristiandis",
+            roles: [
+              "Contributor",
+              "Early iOS Tester"
+            ]
+          },
+          {
+            name: "Bread Cat",
+            icon: "https://github.com/breadcat0314.png",
+            roles: [
+              "Early iOS Tester"
+            ],
+            url: "https://github.com/breadcat0314"
+          },
+          {
+            name: "Puhbu",
+            icon: "https://github.com/puhbu.png",
+            roles: [
+              "Early Android Tester"
+            ]
+          }
+        ]
+      };
+    }
+  });
+
+  // src/plugins/settings/pages/Contributors.tsx
+  function ContributorsSettingsPage() {
+    return /* @__PURE__ */ jsx(import_react_native5.ScrollView, {
+      children: /* @__PURE__ */ jsxs(PageWrapper, {
+        children: [
+          /* @__PURE__ */ jsx(ContributorsSection, {
+            title: "Team",
+            data: contributors_default.team
+          }),
+          /* @__PURE__ */ jsx(ContributorsSection, {
+            title: "Contributors",
+            data: contributors_default.contributors
+          })
+        ]
+      })
+    });
+  }
+  function ContributorsSection({ title, data }) {
+    if (!data.length) return null;
+    return /* @__PURE__ */ jsx(TableRowGroup, {
+      title,
+      children: data.map((item) => {
+        var icon = getAssetIndexByName(`Revenge.Contributors.${item.name}`);
+        return (
+          // biome-ignore lint/correctness/useJsxKeyInIterable: This list never changes
+          /* @__PURE__ */ jsx(TableRow, {
+            icon: icon ? /* @__PURE__ */ jsx(import_react_native5.Image, {
+              style: styles4.avatar,
+              source: icon
+            }) : /* @__PURE__ */ jsx(TableRowIcon, {
+              source: getAssetIndexByName("FriendsIcon")
+            }),
+            label: item.name,
+            subLabel: item.roles.join(" \u2022 "),
+            onPress: item.url ? () => links.openURL(item.url) : void 0,
+            arrow: !!item.url
+          })
+        );
+      })
+    });
+  }
+  var import_react_native5, styles4;
+  var init_Contributors = __esm({
+    "src/plugins/settings/pages/Contributors.tsx"() {
+      "use strict";
+      init_react_jsx_runtime();
+      init_src5();
+      init_common();
+      init_components();
+      import_react_native5 = __toESM(require_react_native(), 1);
+      init_contributors();
+      init_Wrapper();
+      styles4 = import_react_native5.StyleSheet.create({
+        avatar: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          overflow: "hidden",
+          backgroundColor: "transparent"
+        }
+      });
     }
   });
 
@@ -3617,22 +3873,22 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
     });
   }
   function FormSwitch2(props) {
-    return /* @__PURE__ */ jsx(import_react_native4.View, {
-      style: props.disabled ? styles3.disabled : void 0,
+    return /* @__PURE__ */ jsx(import_react_native6.View, {
+      style: props.disabled ? styles5.disabled : void 0,
       children: /* @__PURE__ */ jsx(FormSwitch, {
         ...props
       })
     });
   }
-  var import_react_native4, styles3;
+  var import_react_native6, styles5;
   var init_components2 = __esm({
     "libraries/ui/src/components.tsx"() {
       "use strict";
       init_react_jsx_runtime();
       init_components();
       init_finders();
-      import_react_native4 = __toESM(require_react_native(), 1);
-      styles3 = import_react_native4.StyleSheet.create({
+      import_react_native6 = __toESM(require_react_native(), 1);
+      styles5 = import_react_native6.StyleSheet.create({
         disabled: {
           opacity: 0.5
         }
@@ -3648,7 +3904,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
   });
 
   // src/plugins/settings/pages/Plugins.tsx
-  function PluginCard({ id, name, icon, core, manageable, enabled: _enabled, author, description, horizontalGaps }) {
+  function PluginCard({ id, name, icon, manageable, enabled: _enabled, author, description, horizontalGaps }) {
     var cardStyles = usePluginCardStyles();
     var [enabled, setEnabled] = (0, import_react2.useState)(_enabled);
     return /* @__PURE__ */ jsxs(Card, {
@@ -3659,17 +3915,17 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       children: [
         /* @__PURE__ */ jsxs(Stack, {
           direction: "horizontal",
-          style: styles4.growable,
+          style: styles6.growable,
           children: [
             /* @__PURE__ */ jsxs(Stack, {
               spacing: 8,
               direction: "horizontal",
               style: [
                 cardStyles.topContainer,
-                styles4.resizable
+                styles6.resizable
               ],
               children: [
-                /* @__PURE__ */ jsx(import_react_native5.Image, {
+                /* @__PURE__ */ jsx(import_react_native7.Image, {
                   source: getAssetIndexByName(icon ?? "Revenge.PluginIcon"),
                   style: cardStyles.icon
                 }),
@@ -3684,14 +3940,13 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               disabled: !manageable,
               onValueChange: /* @__PURE__ */ function() {
                 var _ref = _async_to_generator(function* (enabled2) {
-                  if (!enabled2 && core && !(yield showDisableCorePluginConfirmation())) return;
-                  var plugin2 = plugins[id];
+                  var plugin3 = plugins[id];
                   if (enabled2) {
-                    var reloadRequired = plugin2.enable();
+                    var reloadRequired = plugin3.enable();
                     if (reloadRequired) showReloadRequiredAlert(enabled2);
-                    else yield plugin2.start();
+                    else yield plugin3.start();
                   } else {
-                    var { reloadRequired: reloadRequired1 } = plugin2.disable();
+                    var { reloadRequired: reloadRequired1 } = plugin3.disable();
                     if (reloadRequired1) showReloadRequiredAlert(enabled2);
                   }
                   setEnabled(enabled2);
@@ -3708,11 +3963,11 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
           direction: "vertical",
           style: [
             cardStyles.alignedContainer,
-            styles4.growable
+            styles6.growable
           ],
           children: [
             /* @__PURE__ */ jsxs(Text, {
-              style: styles4.growable,
+              style: styles6.growable,
               variant: "heading-md/medium",
               color: "text-muted",
               children: [
@@ -3721,7 +3976,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               ]
             }),
             /* @__PURE__ */ jsx(Text, {
-              style: styles4.growable,
+              style: styles6.growable,
               variant: "text-md/medium",
               children: description
             })
@@ -3731,84 +3986,204 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
     });
   }
   function PluginsSettingsPage() {
-    var [query, setQuery] = (0, import_react2.useState)("");
-    var dimensions = (0, import_react_native5.useWindowDimensions)();
-    var numColumns = Math.floor((dimensions.width - 16) / 448);
-    var data = (0, import_react2.useMemo)(() => Object.values(plugins).filter((plugin2) => plugin2.name.toLowerCase().replaceAll(/\s/g, "").includes(query) || plugin2.id.toLowerCase().includes(query)), [
-      query
+    var { storage } = (0, import_react2.useContext)(PluginContext);
+    useObservable([
+      pluginsStates,
+      storage
     ]);
-    return /* @__PURE__ */ jsxs(PageWrapper, {
-      children: [
-        /* @__PURE__ */ jsx(SearchInput, {
-          size: "md",
-          onChange: (query2) => setQuery(query2.replaceAll(/\s/g, "").toLowerCase())
-        }),
-        /* @__PURE__ */ jsxs(import_react_native5.View, {
-          style: {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "flex-end"
-          },
+    var [query, setQuery] = (0, import_react2.useState)("");
+    var { showCorePlugins, sortMode } = storage.plugins;
+    var allPlugins = (0, import_react2.useMemo)(() => Object.values(plugins).filter((plugin3) => plugin3.name.toLowerCase().replaceAll(/\s/g, "").includes(query) || plugin3.id.toLowerCase().includes(query)).sort((a, b3) => storage.plugins.sortMode === "asc" ? a.name.localeCompare(b3.name) : b3.name.localeCompare(a.name)), [
+      query,
+      storage.plugins.sortMode
+    ]);
+    var externalPluginsData = (0, import_react2.useMemo)(() => allPlugins.filter((plugin3) => !plugin3.core), [
+      allPlugins
+    ]);
+    var corePluginsData = (0, import_react2.useMemo)(() => allPlugins.filter((plugin3) => plugin3.core), [
+      allPlugins
+    ]);
+    var MemoizedContextMenu = /* @__PURE__ */ (0, import_react2.memo)(({ children }) => {
+      return /* @__PURE__ */ jsx(ContextMenu, {
+        title: "Sort & Filter",
+        items: [
+          ...pluginListEmpty ? [] : [
+            [
+              {
+                label: "Sort by name (A-Z)",
+                IconComponent: sortMode === "asc" ? CheckmarkLargeIcon : void 0,
+                action: () => storage.plugins.sortMode = "asc"
+              },
+              {
+                label: "Sort by name (Z-A)",
+                IconComponent: sortMode === "dsc" ? CheckmarkLargeIcon : void 0,
+                action: () => storage.plugins.sortMode = "dsc"
+              }
+            ]
+          ],
+          [
+            {
+              label: "Show core plugins",
+              IconComponent: showCorePlugins ? CheckmarkLargeIcon : void 0,
+              variant: "destructive",
+              action: () => storage.plugins.showCorePlugins = !showCorePlugins
+            }
+          ]
+        ],
+        children
+      });
+    });
+    var pluginListEmpty = !(showCorePlugins ? corePluginsData.length + externalPluginsData.length : externalPluginsData.length);
+    var pluginListNoResults = pluginListEmpty && query;
+    return /* @__PURE__ */ jsx(PageWrapper, {
+      withTopControls: true,
+      children: /* @__PURE__ */ jsx(PluginSettingsPageContext.Provider, {
+        value: {
+          setQuery,
+          showCorePlugins,
+          sortMode,
+          ContextMenuComponent: MemoizedContextMenu
+        },
+        children: pluginListEmpty && !pluginListNoResults ? /* @__PURE__ */ jsx(PluginsSettingsPageEmptyView, {}) : /* @__PURE__ */ jsxs(Fragment, {
           children: [
-            /* @__PURE__ */ jsx(TableRowGroupTitle, {
-              title: "Core Plugins"
-            }),
-            /* @__PURE__ */ jsx(IconButton, {
-              icon: getAssetIndexByName("CircleQuestionIcon-primary"),
-              size: "sm",
-              variant: "secondary",
-              onPress: () => openAlert("revenge.plugins.settings.plugins.core-plugins.description", /* @__PURE__ */ jsx(AlertModal, {
-                title: "What are core plugins?",
-                content: "Core plugins are an essential part of Revenge. They provide core functionalities like allowing you to access this settings menu. Disabling core plugins may cause unexpected behavior.",
-                actions: /* @__PURE__ */ jsx(AlertActionButton, {
-                  variant: "secondary",
-                  text: "Got it"
+            /* @__PURE__ */ jsx(PluginsSettingsPageSearch, {}),
+            pluginListNoResults ? /* @__PURE__ */ jsx(PluginsSettingsPageNoResultsView, {}) : /* @__PURE__ */ jsxs(import_react_native7.ScrollView, {
+              fadingEdgeLength: 32,
+              keyboardShouldPersistTaps: "handled",
+              style: styles6.resizable,
+              children: [
+                /* @__PURE__ */ jsx(PluginsSettingsPageMasonaryFlashList, {
+                  data: externalPluginsData
+                }),
+                showCorePluginsInformationAlert && /* @__PURE__ */ jsx(PluginsSettingsPageMasonaryFlashList, {
+                  header: /* @__PURE__ */ jsxs(import_react_native7.View, {
+                    style: styles6.headerContainer,
+                    children: [
+                      /* @__PURE__ */ jsx(TableRowGroupTitle, {
+                        title: "Core Plugins"
+                      }),
+                      /* @__PURE__ */ jsx(IconButton, {
+                        icon: getAssetIndexByName("CircleQuestionIcon-primary"),
+                        size: "sm",
+                        variant: "tertiary",
+                        onPress: showCorePluginsInformationAlert
+                      })
+                    ]
+                  }),
+                  data: corePluginsData
                 })
-              }))
+              ]
             })
           ]
+        })
+      })
+    });
+  }
+  function PluginsSettingsPageEmptyView() {
+    var { ContextMenuComponent } = (0, import_react2.useContext)(PluginSettingsPageContext);
+    return /* @__PURE__ */ jsxs(Stack, {
+      spacing: 24,
+      style: [
+        styles6.growable,
+        styles6.centerChildren
+      ],
+      children: [
+        /* @__PURE__ */ jsx(import_react_native7.Image, {
+          source: getAssetIndexByName("empty"),
+          style: styles6.emptyImage
         }),
-        /* @__PURE__ */ jsx(import_react_native5.ScrollView, {
-          contentContainerStyle: {
-            flex: 1
+        /* @__PURE__ */ jsx(Text, {
+          variant: "heading-lg/semibold",
+          children: "No plugins yet!"
+        }),
+        /* @__PURE__ */ jsxs(import_react_native7.View, {
+          style: {
+            gap: 8
           },
-          children: /* @__PURE__ */ jsx(MasonryFlashList, {
-            fadingEdgeLength: 32,
-            data,
-            renderItem: ({ item, columnIndex }) => /* @__PURE__ */ jsx(PluginCard, {
-              ...item,
-              horizontalGaps: dimensions.width > 464 && columnIndex < numColumns - 1
+          children: [
+            /* @__PURE__ */ jsx(Button, {
+              size: "lg",
+              icon: getAssetIndexByName("DownloadIcon"),
+              variant: "primary",
+              disabled: true,
+              text: "Install a plugin"
             }),
-            // Don't ask...
-            estimatedItemSize: 24.01 + 32 + 62 * import_react_native5.PixelRatio.getFontScale() ** 1.35,
-            keyExtractor: (item) => item.id,
-            numColumns,
-            keyboardShouldPersistTaps: "handled"
-          }, numColumns)
+            /* @__PURE__ */ jsx(ContextMenuComponent, {
+              children: (props) => /* @__PURE__ */ jsx(Button, {
+                ...props,
+                size: "lg",
+                icon: getAssetIndexByName("FiltersHorizontalIcon"),
+                variant: "secondary",
+                text: "Change filters"
+              })
+            })
+          ]
         })
       ]
     });
   }
-  function showDisableCorePluginConfirmation() {
-    return new Promise((resolve) => {
-      openAlert("revenge.plugins.settings.plugins.core-plugins.disable-warning", /* @__PURE__ */ jsx(AlertModal, {
-        title: "Disable core plugin?",
-        content: "Core plugins are an essential part of Revenge. Disabling them may cause unexpected behavior.",
-        actions: /* @__PURE__ */ jsxs(Fragment, {
-          children: [
-            /* @__PURE__ */ jsx(AlertActionButton, {
-              variant: "destructive",
-              text: "Disable anyways",
-              onPress: () => resolve(true)
-            }),
-            /* @__PURE__ */ jsx(AlertActionButton, {
-              variant: "secondary",
-              text: "Cancel",
-              onPress: () => resolve(false)
-            })
-          ]
+  function PluginsSettingsPageNoResultsView() {
+    return /* @__PURE__ */ jsxs(Stack, {
+      spacing: 24,
+      style: [
+        styles6.growable,
+        styles6.centerChildren
+      ],
+      children: [
+        /* @__PURE__ */ jsx(import_react_native7.Image, {
+          source: getAssetIndexByName("empty_quick_switcher"),
+          style: styles6.emptyImage
+        }),
+        /* @__PURE__ */ jsx(Text, {
+          variant: "heading-lg/semibold",
+          children: "No results..."
         })
-      }));
+      ]
+    });
+  }
+  function PluginsSettingsPageMasonaryFlashList({ data, header }) {
+    var dimensions = (0, import_react_native7.useWindowDimensions)();
+    var numColumns = Math.floor((dimensions.width - 16) / 448);
+    var estimatedItemSize = 24.01 + 32 + 62 * import_react_native7.PixelRatio.getFontScale() ** 1.35;
+    var renderItem = (0, import_react2.useMemo)(() => ({ item, columnIndex }) => /* @__PURE__ */ jsx(PluginCard, {
+      ...item,
+      horizontalGaps: dimensions.width > 464 && columnIndex < numColumns - 1
+    }), []);
+    return /* @__PURE__ */ jsx(MasonryFlashList, {
+      stickyHeaderIndices: header ? [
+        0
+      ] : void 0,
+      ListHeaderComponent: header,
+      renderItem,
+      data,
+      keyExtractor: (item) => item.id,
+      numColumns,
+      estimatedItemSize,
+      keyboardShouldPersistTaps: "handled"
+    });
+  }
+  function PluginsSettingsPageSearch() {
+    var { setQuery, ContextMenuComponent } = (0, import_react2.useContext)(PluginSettingsPageContext);
+    return /* @__PURE__ */ jsxs(import_react_native7.View, {
+      style: styles6.queryContainer,
+      children: [
+        /* @__PURE__ */ jsx(import_react_native7.View, {
+          style: styles6.growable,
+          children: /* @__PURE__ */ jsx(SearchInput, {
+            isRound: true,
+            isClearable: true,
+            size: "md",
+            onChange: (query) => setQuery(query.replaceAll(/\s/g, "").toLowerCase())
+          })
+        }),
+        /* @__PURE__ */ jsx(ContextMenuComponent, {
+          children: (props) => /* @__PURE__ */ jsx(IconButton, {
+            ...props,
+            icon: getAssetIndexByName("FiltersHorizontalIcon"),
+            variant: "tertiary"
+          })
+        })
+      ]
     });
   }
   function showReloadRequiredAlert(enabling) {
@@ -3830,7 +4205,17 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       })
     }));
   }
-  var import_react2, import_react_native5, usePluginCardStyles, styles4;
+  function showCorePluginsInformationAlert() {
+    return openAlert("revenge.plugins.settings.plugins.core-plugins.description", /* @__PURE__ */ jsx(AlertModal, {
+      title: "What are core plugins?",
+      content: "Core plugins are an essential part of Revenge. They provide core functionalities like allowing you to access this settings menu. Disabling core plugins may cause unexpected behavior.",
+      actions: /* @__PURE__ */ jsx(AlertActionButton, {
+        variant: "secondary",
+        text: "Got it"
+      })
+    }));
+  }
+  var import_react2, import_react_native7, usePluginCardStyles, styles6, PluginSettingsPageContext;
   var init_Plugins = __esm({
     "src/plugins/settings/pages/Plugins.tsx"() {
       "use strict";
@@ -3845,7 +4230,11 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       init_components2();
       init_Wrapper();
       import_react2 = __toESM(require_react(), 1);
-      import_react_native5 = __toESM(require_react_native(), 1);
+      import_react_native7 = __toESM(require_react_native(), 1);
+      init_icons();
+      init_src7();
+      init_src6();
+      init_settings2();
       usePluginCardStyles = createStyles({
         icon: {
           width: 20,
@@ -3869,25 +4258,55 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
           paddingLeft: 28
         }
       });
-      styles4 = import_react_native5.StyleSheet.create({
+      styles6 = import_react_native7.StyleSheet.create({
         growable: {
           flexGrow: 1
         },
+        centerChildren: {
+          alignItems: "center",
+          justifyContent: "center"
+        },
         resizable: {
           flex: 1
+        },
+        headerContainer: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          paddingBottom: 12
+        },
+        queryContainer: {
+          flexDirection: "row",
+          width: "100%",
+          gap: 8
+        },
+        emptyImage: {
+          width: "40%",
+          height: "20%",
+          objectFit: "contain"
         }
       });
+      PluginSettingsPageContext = /* @__PURE__ */ (0, import_react2.createContext)(void 0);
+    }
+  });
+
+  // src/plugins/settings/constants.ts
+  var GitHubURL, DiscordURL;
+  var init_constants3 = __esm({
+    "src/plugins/settings/constants.ts"() {
+      "use strict";
+      GitHubURL = "https://github.com/revenge-mod";
+      DiscordURL = "https://discord.com/invite/ddcQf3s2Uq";
     }
   });
 
   // src/plugins/settings/pages/Revenge.tsx
   function RevengeSettingsPage() {
-    var { assets: assets2 } = revenge;
     var navigation = NavigationNative.useNavigation();
     useObservable([
       settings
     ]);
-    return /* @__PURE__ */ jsx(import_react_native6.ScrollView, {
+    return /* @__PURE__ */ jsx(import_react_native8.ScrollView, {
       children: /* @__PURE__ */ jsxs(PageWrapper, {
         children: [
           /* @__PURE__ */ jsx(TableRowGroup, {
@@ -3895,93 +4314,161 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
             children: /* @__PURE__ */ jsx(TableRow, {
               label: "About",
               icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                source: assets2.getIndexByName("CircleInformationIcon-primary")
+                source: getAssetIndexByName("CircleInformationIcon-primary")
               }),
               arrow: true,
               onPress: () => navigation.push("RevengeAbout")
             })
+          }),
+          /* @__PURE__ */ jsxs(TableRowGroup, {
+            title: "Revenge",
+            children: [
+              /* @__PURE__ */ jsx(TableRow, {
+                label: "Discord",
+                icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                  source: getAssetIndexByName("Discord")
+                }),
+                arrow: true,
+                onPress: () => links.openDeeplink(DiscordURL)
+              }),
+              /* @__PURE__ */ jsx(TableRow, {
+                label: "GitHub",
+                icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                  source: getAssetIndexByName("img_account_sync_github_white")
+                }),
+                arrow: true,
+                onPress: () => links.openURL(GitHubURL)
+              }),
+              /* @__PURE__ */ jsx(TableRow, {
+                label: "Contributors",
+                icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                  source: getAssetIndexByName("FriendsIcon")
+                }),
+                arrow: true,
+                onPress: () => navigation.push("RevengeContributors")
+              })
+            ]
           }),
           /* @__PURE__ */ jsx(TableRowGroup, {
             title: "Actions",
             children: /* @__PURE__ */ jsx(TableRow, {
               label: "Reload Discord",
               icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                source: assets2.getIndexByName("RetryIcon")
+                source: getAssetIndexByName("RetryIcon")
               }),
               // Passing BundleUpdaterManager.reload directly just explodes for some reason. Maybe onPress had args?
               onPress: () => BundleUpdaterManager.reload()
             })
-          }),
-          /* @__PURE__ */ jsx(TableRowGroup, {
-            title: "Advanced",
-            children: [
-              ...rows
-            ].map((Row, index) => /* @__PURE__ */ jsx(Row, {}, index.toString()))
           })
         ]
       })
     });
   }
-  function addTableRowsToAdvancedSectionInRevengePage(...comps) {
-    for (var comp of comps) rows.add(comp);
-    return () => {
-      for (var comp2 of comps) rows.delete(comp2);
-    };
-  }
-  var import_react_native6, rows;
+  var import_react_native8;
   var init_Revenge = __esm({
     "src/plugins/settings/pages/Revenge.tsx"() {
       "use strict";
       init_react_jsx_runtime();
+      init_src5();
       init_common();
       init_components();
       init_native();
       init_src7();
       init_src6();
+      init_constants3();
       init_Wrapper();
-      import_react_native6 = __toESM(require_react_native(), 1);
-      rows = /* @__PURE__ */ new Set();
+      import_react_native8 = __toESM(require_react_native(), 1);
     }
   });
 
-  // src/plugins/settings/index.ts
-  var getCustomRows, transformRowToRawRow;
+  // src/plugins/settings/index.tsx
+  function getCustomSettingRows() {
+    return [
+      ...Object.values(customData.sections),
+      {
+        name: "(unbound)",
+        settings: customData.rows
+      }
+    ].map((section) => Object.entries(section.settings).reduce((rows, [key, row]) => {
+      rows[key] = transformSettingRowToRawSettingRow(key, row);
+      return rows;
+    }, {})).reduce((rows, newRows) => Object.assign(rows, newRows), {});
+  }
+  function transformSettingRowToRawSettingRow(key, row) {
+    return {
+      title: () => row.label,
+      parent: row.parent ?? null,
+      icon: row.icon,
+      IconComponent: row.icon ? () => TableRowIcon({
+        source: row.icon
+      }) : void 0,
+      unsearchable: row.unsearchable,
+      screen: row.type === "route" ? {
+        route: key,
+        getComponent: () => row.component
+      } : void 0,
+      onPress: row.onPress,
+      useDescription: row.description ? () => row.description : void 0,
+      useTrailing: row.trailing ? () => row.trailing : void 0,
+      useIsDisabled: typeof row.disabled === "boolean" ? () => row.disabled : void 0,
+      usePredicate: row.predicate,
+      onValueChange: row.onValueChange,
+      useValue: () => row.value,
+      type: row.type
+    };
+  }
+  var import_react4, plugin, PluginContext;
   var init_settings2 = __esm({
-    "src/plugins/settings/index.ts"() {
+    "src/plugins/settings/index.tsx"() {
       "use strict";
       init_async_to_generator();
+      init_react_jsx_runtime();
       init_components();
       init_internals();
       init_functions();
       init_react2();
       init_settings();
       init_About();
+      init_Contributors();
       init_CustomPageRenderer();
       init_Plugins();
       init_Revenge();
-      registerPlugin({
+      init_contributors();
+      import_react4 = __toESM(require_react(), 1);
+      plugin = registerPlugin({
         name: "Settings",
         author: "Revenge",
         description: "Settings menus for Revenge",
         id: "revenge.settings",
         version: "1.0.0",
         icon: "SettingsIcon",
-        afterAppRender({ patcher: patcher6, revenge: { assets: assets2, modules: modules3, ui: { settings: sui } } }) {
+        afterAppRender(context) {
           return _async_to_generator(function* () {
+            var { patcher: patcher6, revenge: { assets, modules: modules3, ui: { settings: sui } } } = context;
+            for (var member of contributors_default.team.concat(contributors_default.contributors)) {
+              if (!member.icon) continue;
+              assets.registerCustom({
+                name: `Revenge.Contributors.${member.name}`,
+                type: "webp"
+              }, member.icon);
+            }
             sui.createSection({
               name: "Revenge",
               settings: {
                 Revenge: {
                   type: "route",
                   label: "Revenge",
-                  icon: assets2.getIndexByName("Revenge.RevengeIcon"),
+                  icon: assets.getIndexByName("Revenge.RevengeIcon"),
                   component: RevengeSettingsPage
                 },
                 RevengePlugins: {
                   type: "route",
                   label: "Plugins",
-                  icon: assets2.getIndexByName("Revenge.PluginIcon"),
-                  component: PluginsSettingsPage
+                  icon: assets.getIndexByName("Revenge.PluginIcon"),
+                  component: () => /* @__PURE__ */ jsx(PluginContext.Provider, {
+                    value: context,
+                    children: /* @__PURE__ */ jsx(PluginsSettingsPage, {})
+                  })
                 }
               }
             });
@@ -3989,7 +4476,13 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               type: "route",
               label: "About",
               component: AboutSettingsPage,
-              icon: assets2.getIndexByName("CircleInformationIcon-primary")
+              icon: assets.getIndexByName("CircleInformationIcon-primary")
+            });
+            sui.createRoute("RevengeContributors", {
+              type: "route",
+              label: "Contributors",
+              component: ContributorsSettingsPage,
+              icon: assets.getIndexByName("FriendsIcon")
             });
             sui.createRoute("RevengeCustomPage", {
               type: "route",
@@ -4007,12 +4500,12 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               enumerable: true,
               configurable: true,
               get: () => ({
-                ...getCustomRows(),
+                ...getCustomSettingRows(),
                 ...rendererConfig
               }),
               set: (v2) => rendererConfig = v2
             });
-            patcher6.after(SettingsOverviewScreen, "default", (_2, children) => {
+            patcher6.after(SettingsOverviewScreen, "default", (_3, children) => {
               var registeredCustomRows = new Set(Object.values(customData.sections).flatMap(({ settings: settings2 }) => Object.keys(settings2)));
               var { sections } = findInReactTree(children, (i) => i.props?.sections).props;
               if (sections.findIndex((section2) => section2.settings.some((setting) => registeredCustomRows.has(setting))) !== -1) return;
@@ -4026,43 +4519,15 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               }
             }, "addNewSettingsSections");
           })();
-        }
-      }, true);
-      getCustomRows = () => {
-        return [
-          ...Object.values(customData.sections),
-          {
-            name: "(unbound)",
-            settings: customData.rows
+        },
+        initializeStorage: () => ({
+          plugins: {
+            sortMode: "asc",
+            showCorePlugins: true
           }
-        ].map((section) => Object.entries(section.settings).reduce((rows2, [key, row]) => {
-          rows2[key] = transformRowToRawRow(key, row);
-          return rows2;
-        }, {})).reduce((rows2, newRows) => Object.assign(rows2, newRows), {});
-      };
-      transformRowToRawRow = (key, row) => {
-        return {
-          title: () => row.label,
-          parent: row.parent ?? null,
-          icon: row.icon,
-          IconComponent: row.icon ? () => TableRowIcon({
-            source: row.icon
-          }) : void 0,
-          unsearchable: row.unsearchable,
-          screen: row.type === "route" ? {
-            route: key,
-            getComponent: () => row.component
-          } : void 0,
-          onPress: row.onPress,
-          useDescription: row.description ? () => row.description : void 0,
-          useTrailing: row.trailing ? () => row.trailing : void 0,
-          useIsDisabled: typeof row.disabled === "boolean" ? () => row.disabled : void 0,
-          usePredicate: row.predicate,
-          onValueChange: row.onValueChange,
-          useValue: () => row.value,
-          type: row.type
-        };
-      };
+        })
+      }, true);
+      PluginContext = /* @__PURE__ */ (0, import_react4.createContext)(null);
     }
   });
 
@@ -4078,7 +4543,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
         id: "revenge.staff-settings",
         version: "1.0.0",
         icon: "StaffBadgeIcon",
-        onMetroModuleLoad(_2, __, exports, unsub) {
+        onMetroModuleLoad(_3, __, exports, unsub) {
           if (exports.default?.constructor?.displayName === "DeveloperExperimentStore") {
             unsub();
             exports.default = new Proxy(exports.default, {
@@ -4104,7 +4569,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       variant: DisplayableTypes.has(asset.type) ? "default" : "danger",
       label: asset.name,
       subLabel: `Index: ${index} \u2022 Type: ${asset.type} \u2022 ${!moduleId ? "Custom asset" : `Module ID: ${moduleId}`}`,
-      icon: DisplayableTypes.has(asset.type) ? /* @__PURE__ */ jsx(import_react_native7.Image, {
+      icon: DisplayableTypes.has(asset.type) ? /* @__PURE__ */ jsx(import_react_native9.Image, {
         source: index,
         style: {
           width: 32,
@@ -4119,7 +4584,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
         content: `Index: ${index}
 Module ID: ${moduleId ?? "(custom asset)"}
 Type: ${asset.type}`,
-        extraContent: DisplayableTypes.has(asset.type) ? /* @__PURE__ */ jsx(import_react_native7.Image, {
+        extraContent: DisplayableTypes.has(asset.type) ? /* @__PURE__ */ jsx(import_react_native9.Image, {
           resizeMode: "contain",
           source: index,
           style: {
@@ -4166,33 +4631,25 @@ Type: ${asset.type}`,
     });
   }
   function AssetBrowserSettingsPage() {
-    var [search, setSearch] = (0, import_react4.useState)("");
-    return /* @__PURE__ */ jsxs(import_react_native7.View, {
-      style: {
-        gap: 16,
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        flexGrow: 1
-      },
+    var [search, setSearch] = (0, import_react5.useState)("");
+    return /* @__PURE__ */ jsxs(PageWrapper, {
       children: [
         /* @__PURE__ */ jsx(SearchInput, {
           size: "md",
-          style: {
-            margin: 10
-          },
           onChange: (v2) => setSearch(v2)
         }),
         /* @__PURE__ */ jsx(FlashList, {
-          data: Object.keys(cache.assets).concat(Object.keys(customAssets)).filter((name) => {
-            var source = name in cache.assets ? cache.assets : name in customAssets ? customAssets : void 0;
-            if (!source) return false;
-            return name.toLowerCase().includes(search.toLowerCase()) || source[name]?.toString() === search;
-          }).map((name) => {
-            var index = cache.assets[name] ?? customAssets[name];
+          data: Object.values(cache.assetModules).flatMap((reg) => Object.values(reg).filter((x2) => typeof x2 === "number").map(requireModule)).concat(Object.values(customAssets)).map((index) => {
+            var asset = getAssetByIndex(index);
+            return [
+              index,
+              asset
+            ];
+          }).filter(([index, asset]) => asset.name.toLowerCase().includes(search.toLowerCase()) || index.toString().includes(search) || asset.type.includes(search)).map(([index, asset]) => {
             return {
               index,
-              asset: getAssetByIndex(index),
-              moduleId: cache.assetModules[name]
+              asset,
+              moduleId: getAssetModuleIdByIndex(index)
             };
           }),
           renderItem: ({ item }) => /* @__PURE__ */ jsx(AssetDisplay, {
@@ -4203,7 +4660,7 @@ Type: ${asset.type}`,
       ]
     });
   }
-  var import_react4, import_react_native7, DisplayableTypes, UndisplayableTypesIconMap;
+  var import_react5, import_react_native9, DisplayableTypes, UndisplayableTypesIconMap;
   var init_AssetBrowser = __esm({
     "src/plugins/developer-settings/pages/AssetBrowser.tsx"() {
       "use strict";
@@ -4213,8 +4670,9 @@ Type: ${asset.type}`,
       init_components();
       init_metro();
       init_components2();
-      import_react4 = __toESM(require_react(), 1);
-      import_react_native7 = __toESM(require_react_native(), 1);
+      import_react5 = __toESM(require_react(), 1);
+      import_react_native9 = __toESM(require_react_native(), 1);
+      init_Wrapper();
       DisplayableTypes = /* @__PURE__ */ new Set([
         "png",
         "jpg",
@@ -4234,7 +4692,7 @@ Type: ${asset.type}`,
   // src/plugins/developer-settings/pages/DebugPerformanceTimes.tsx
   function DebugPerformanceTimesSettingsPage() {
     var previousTimestamp;
-    return /* @__PURE__ */ jsx(import_react_native8.ScrollView, {
+    return /* @__PURE__ */ jsx(import_react_native10.ScrollView, {
       children: /* @__PURE__ */ jsxs(PageWrapper, {
         children: [
           /* @__PURE__ */ jsx(Text, {
@@ -4262,14 +4720,14 @@ Type: ${asset.type}`,
       })
     });
   }
-  var import_react_native8, PerformanceTimesKeys;
+  var import_react_native10, PerformanceTimesKeys;
   var init_DebugPerformanceTimes = __esm({
     "src/plugins/developer-settings/pages/DebugPerformanceTimes.tsx"() {
       "use strict";
       init_react_jsx_runtime();
       init_src();
       init_components();
-      import_react_native8 = __toESM(require_react_native(), 1);
+      import_react_native10 = __toESM(require_react_native(), 1);
       init_Wrapper();
       PerformanceTimesKeys = Object.keys(PerformanceTimes).sort((a, b3) => timeOf(a) - timeOf(b3));
     }
@@ -4315,76 +4773,205 @@ Type: ${asset.type}`,
     }
   });
 
+  // src/plugins/developer-settings/debugger.ts
+  function disconnectFromDebugger() {
+    DebuggerContext.ws.close();
+    DebuggerContext.connected = false;
+  }
+  function connectToDebugger(addr, revenge2) {
+    var ws = DebuggerContext.ws = new WebSocket(`ws://${addr}`);
+    ws.addEventListener("open", () => {
+      DebuggerContext.connected = true;
+      DebuggerEvents.emit("connect");
+      DebuggerEvents.emit("*", "connect");
+    });
+    ws.addEventListener("close", () => {
+      DebuggerContext.connected = false;
+      DebuggerEvents.emit("disconnect");
+      DebuggerEvents.emit("*", "disconnect");
+    });
+    ws.addEventListener("error", (e) => {
+      DebuggerContext.connected = false;
+      DebuggerEvents.emit("error", e);
+      DebuggerEvents.emit("*", "error", e);
+    });
+    ws.addEventListener("message", (e) => {
+      try {
+        var json = JSON.parse(e.data);
+        if (typeof json.code === "string" && typeof json.nonce === "string") {
+          var res;
+          try {
+            res = globalThis.eval(json.code);
+          } catch (e2) {
+            res = e2;
+          }
+          var inspect = revenge2.modules.findProp("inspect");
+          try {
+            ws.send(res instanceof Error ? JSON.stringify({
+              level: "error",
+              message: String(res),
+              nonce: json.nonce
+            }) : JSON.stringify({
+              level: "info",
+              message: inspect(res, {
+                showHidden: true
+              }),
+              nonce: json.nonce
+            }));
+          } catch (e2) {
+            ws.send(JSON.stringify({
+              level: "error",
+              message: `DebuggerError: ${String(e2)}`,
+              nonce: json.nonce
+            }));
+          }
+        }
+      } catch (e2) {
+      }
+    });
+  }
+  var DebuggerEvents, DebuggerContext;
+  var init_debugger = __esm({
+    "src/plugins/developer-settings/debugger.ts"() {
+      "use strict";
+      init_events();
+      DebuggerEvents = new EventEmitter();
+      DebuggerContext = {
+        ws: void 0,
+        connected: false
+      };
+    }
+  });
+
   // src/plugins/developer-settings/pages/Developer.tsx
   function DeveloperSettingsPage() {
-    var { storage, revenge: { assets: assets2, modules: modules3 } } = React.useContext(PluginContext);
+    var context = (0, import_react6.useContext)(PluginContext2);
+    var { storage, revenge: { assets, modules: modules3 } } = context;
     useObservable([
       storage
     ]);
     var navigation = NavigationNative.useNavigation();
-    var refEvalCode = React.useRef("");
-    var refDevToolsAddr = React.useRef(storage.reactDevTools.address || "localhost:8097");
-    var [connected, setConnected] = React.useState(DevToolsContext.connected);
-    React.useEffect(() => {
+    var refDevToolsAddr = (0, import_react6.useRef)(storage.reactDevTools.address || "localhost:8097");
+    var [rdtConnected, setRdtConnected] = (0, import_react6.useState)(DevToolsContext.connected);
+    var refDebuggerAddr = (0, import_react6.useRef)(storage.debugger.address || "localhost:9090");
+    var [dbgConnected, setDbgConnected] = (0, import_react6.useState)(DebuggerContext.connected);
+    (0, import_react6.useEffect)(() => {
       var listener = (evt) => {
-        if (evt === "connect") setConnected(true);
-        else setConnected(false);
+        if (evt === "connect") setRdtConnected(true);
+        else setRdtConnected(false);
       };
       DevToolsEvents.on("*", listener);
       return () => void DevToolsEvents.off("*", listener);
     }, []);
-    return /* @__PURE__ */ jsx(import_react_native9.ScrollView, {
+    (0, import_react6.useEffect)(() => {
+      var listener = (evt) => {
+        if (evt === "connect") setDbgConnected(true);
+        else setDbgConnected(false);
+      };
+      DebuggerEvents.on("*", listener);
+      return () => void DebuggerEvents.off("*", listener);
+    }, []);
+    return /* @__PURE__ */ jsx(import_react_native11.ScrollView, {
       children: /* @__PURE__ */ jsxs(PageWrapper, {
         children: [
-          typeof __reactDevTools !== "undefined" && /* @__PURE__ */ jsxs(Stack, {
+          /* @__PURE__ */ jsxs(Stack, {
             spacing: 8,
             direction: "vertical",
             children: [
+              typeof __reactDevTools !== "undefined" && /* @__PURE__ */ jsxs(Fragment, {
+                children: [
+                  /* @__PURE__ */ jsx(TextInput, {
+                    editable: !rdtConnected,
+                    isDisabled: rdtConnected,
+                    leadingText: "ws://",
+                    defaultValue: refDevToolsAddr.current,
+                    label: "React DevTools",
+                    onChange: (text) => refDevToolsAddr.current = text,
+                    onBlur: () => {
+                      if (refDevToolsAddr.current === storage.reactDevTools.address) return;
+                      storage.reactDevTools.address = refDevToolsAddr.current;
+                      toasts.open({
+                        key: "revenge.plugins.settings.react-devtools.saved",
+                        content: "Saved DevTools address!"
+                      });
+                    },
+                    returnKeyType: "done"
+                  }),
+                  /* @__PURE__ */ jsxs(TableRowGroup, {
+                    children: [
+                      rdtConnected ? /* @__PURE__ */ jsx(TableRow, {
+                        label: "Disconnect from React DevTools",
+                        variant: "danger",
+                        icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                          variant: "danger",
+                          source: assets.getIndexByName("Revenge.ReactIcon")
+                        }),
+                        onPress: () => disconnectFromDevTools()
+                      }) : /* @__PURE__ */ jsx(TableRow, {
+                        label: "Connect to React DevTools",
+                        icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                          source: assets.getIndexByName("Revenge.ReactIcon")
+                        }),
+                        onPress: () => connectToDevTools(refDevToolsAddr.current)
+                      }),
+                      /* @__PURE__ */ jsx(TableSwitchRow, {
+                        label: "Auto Connect on Startup",
+                        subLabel: "Automatically connect to React DevTools when the app starts.",
+                        icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                          source: assets.getIndexByName("Revenge.ReactIcon")
+                        }),
+                        value: storage.reactDevTools.autoConnect,
+                        onValueChange: (v2) => storage.reactDevTools.autoConnect = v2
+                      })
+                    ]
+                  }, String(rdtConnected))
+                ]
+              }),
               /* @__PURE__ */ jsx(TextInput, {
-                editable: !connected,
-                isDisabled: connected,
+                editable: !dbgConnected,
+                isDisabled: dbgConnected,
                 leadingText: "ws://",
-                defaultValue: refDevToolsAddr.current,
-                label: "React DevTools",
-                onChange: (text) => refDevToolsAddr.current = text,
+                defaultValue: refDebuggerAddr.current,
+                label: "Debugger",
+                onChange: (text) => refDebuggerAddr.current = text,
                 onBlur: () => {
-                  if (refDevToolsAddr.current === storage.reactDevTools.address) return;
-                  storage.reactDevTools.address = refDevToolsAddr.current;
+                  if (refDebuggerAddr.current === storage.debugger.address) return;
+                  storage.debugger.address = refDebuggerAddr.current;
                   toasts.open({
-                    key: "revenge.plugins.settings.react-devtools.saved",
-                    content: "Saved DevTools address!"
+                    key: "revenge.plugins.developer-settings.debugger.saved",
+                    content: "Saved debugger address!"
                   });
                 },
                 returnKeyType: "done"
               }),
               /* @__PURE__ */ jsxs(TableRowGroup, {
                 children: [
-                  connected ? /* @__PURE__ */ jsx(TableRow, {
-                    label: "Disconnect from React DevTools",
+                  dbgConnected ? /* @__PURE__ */ jsx(TableRow, {
+                    label: "Disconnect from debugger",
                     variant: "danger",
                     icon: /* @__PURE__ */ jsx(TableRowIcon, {
                       variant: "danger",
-                      source: assets2.getIndexByName("Revenge.ReactIcon")
+                      source: assets.getIndexByName("LinkIcon")
                     }),
-                    onPress: () => disconnectFromDevTools()
+                    onPress: () => disconnectFromDebugger()
                   }) : /* @__PURE__ */ jsx(TableRow, {
-                    label: "Connect to React DevTools",
+                    label: "Connect to debugger",
                     icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                      source: assets2.getIndexByName("Revenge.ReactIcon")
+                      source: assets.getIndexByName("LinkIcon")
                     }),
-                    onPress: () => connectToDevTools(refDevToolsAddr.current)
+                    onPress: () => connectToDebugger(storage.debugger.address, context.revenge)
                   }),
                   /* @__PURE__ */ jsx(TableSwitchRow, {
                     label: "Auto Connect on Startup",
-                    subLabel: "Automatically connect to React DevTools when the app starts.",
+                    subLabel: "Automatically connect to debugger when the app starts.",
                     icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                      source: assets2.getIndexByName("Revenge.ReactIcon")
+                      source: assets.getIndexByName("LinkIcon")
                     }),
-                    value: storage.reactDevTools.autoConnect,
-                    onValueChange: (v2) => storage.reactDevTools.autoConnect = v2
+                    value: storage.debugger.autoConnect,
+                    onValueChange: (v2) => storage.debugger.autoConnect = v2
                   })
                 ]
-              }, String(connected))
+              }, String(dbgConnected))
             ]
           }),
           /* @__PURE__ */ jsxs(TableRowGroup, {
@@ -4393,44 +4980,19 @@ Type: ${asset.type}`,
               /* @__PURE__ */ jsx(TableRow, {
                 label: "Evaluate JavaScript",
                 icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                  source: assets2.getIndexByName("PaperIcon")
+                  source: assets.getIndexByName("PaperIcon")
                 }),
                 onPress: () => {
-                  alerts.openAlert("revenge.plugins.storage.evaluate", /* @__PURE__ */ jsx(AlertModal, {
-                    title: "Evaluate JavaScript",
-                    extraContent: /* @__PURE__ */ jsx(TextArea, {
-                      autoFocus: true,
-                      label: "Code",
-                      size: "md",
-                      placeholder: "ReactNative.NativeModules.BundleUpdaterManager.reload()",
-                      onChange: (v2) => refEvalCode.current = v2
-                    }),
-                    actions: /* @__PURE__ */ jsxs(Stack, {
-                      children: [
-                        /* @__PURE__ */ jsx(AlertActionButton, {
-                          text: "Evaluate",
-                          variant: "primary",
-                          onPress: () => alert(modules3.findProp("inspect")(
-                            // biome-ignore lint/security/noGlobalEval: This is intentional
-                            globalThis.eval(refEvalCode.current),
-                            {
-                              depth: 5
-                            }
-                          ))
-                        }),
-                        /* @__PURE__ */ jsx(AlertActionButton, {
-                          text: "Cancel",
-                          variant: "secondary"
-                        })
-                      ]
-                    })
+                  alerts.openAlert("revenge.plugins.storage.evaluate", /* @__PURE__ */ jsx(PluginContext2.Provider, {
+                    value: context,
+                    children: /* @__PURE__ */ jsx(DeveloperSettingsPageEvaluateJavaScriptAlert, {})
                   }));
                 }
               }),
               /* @__PURE__ */ jsx(TableRow, {
                 label: "Asset Browser",
                 icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                  source: assets2.getIndexByName("ImageIcon")
+                  source: assets.getIndexByName("ImageIcon")
                 }),
                 arrow: true,
                 onPress: () => navigation.navigate("RevengeAssetBrowser")
@@ -4441,10 +5003,23 @@ Type: ${asset.type}`,
                 subLabel: "This will remove the settings file and reload the app.",
                 icon: /* @__PURE__ */ jsx(TableRowIcon, {
                   variant: "danger",
-                  source: assets2.getIndexByName("TrashIcon")
+                  source: assets.getIndexByName("TrashIcon")
                 }),
                 onPress: /* @__PURE__ */ _async_to_generator(function* () {
                   yield settings[storageContextSymbol].file.delete();
+                  BundleUpdaterManager.reload();
+                })
+              }),
+              /* @__PURE__ */ jsx(TableRow, {
+                variant: "danger",
+                label: "Clear Plugins Data",
+                subLabel: "This will remove the all plugin-related data and reload the app.",
+                icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                  variant: "danger",
+                  source: assets.getIndexByName("TrashIcon")
+                }),
+                onPress: /* @__PURE__ */ _async_to_generator(function* () {
+                  yield FileModule.clearFolder("documents", PluginsDirectoryPath);
                   BundleUpdaterManager.reload();
                 })
               })
@@ -4456,7 +5031,7 @@ Type: ${asset.type}`,
               /* @__PURE__ */ jsx(TableRow, {
                 label: "Test CustomPageRenderer",
                 icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                  source: assets2.getIndexByName("ScreenArrowIcon")
+                  source: assets.getIndexByName("ScreenArrowIcon")
                 }),
                 arrow: true,
                 onPress: () => navigation.navigate("RevengeCustomPage", {
@@ -4469,7 +5044,7 @@ Type: ${asset.type}`,
                 label: "Test ErrorBoundary",
                 icon: /* @__PURE__ */ jsx(TableRowIcon, {
                   variant: "danger",
-                  source: assets2.getIndexByName("ScreenXIcon")
+                  source: assets.getIndexByName("ScreenXIcon")
                 }),
                 arrow: true,
                 onPress: () => navigation.navigate("RevengeCustomPage", {
@@ -4485,7 +5060,7 @@ Type: ${asset.type}`,
             children: /* @__PURE__ */ jsx(TableRow, {
               label: "Show Debug Performance Times",
               icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                source: assets2.getIndexByName("TimerIcon")
+                source: assets.getIndexByName("TimerIcon")
               }),
               onPress: () => navigation.navigate("RevengeDebugPerformanceTimes")
             })
@@ -4498,7 +5073,7 @@ Type: ${asset.type}`,
               subLabel: "Module blacklists, lookup flags, asset index maps, asset module ID maps. This will reload the app.",
               icon: /* @__PURE__ */ jsx(TableRowIcon, {
                 variant: "danger",
-                source: assets2.getIndexByName("TrashIcon")
+                source: assets.getIndexByName("TrashIcon")
               }),
               onPress: () => {
                 modules3.metro.invalidateCache();
@@ -4510,7 +5085,51 @@ Type: ${asset.type}`,
       })
     });
   }
-  var import_react_native9;
+  function DeveloperSettingsPageEvaluateJavaScriptAlert() {
+    var { revenge: { modules: modules3 } } = (0, import_react6.useContext)(PluginContext2);
+    var [evalAwaitResult, setEvalAwaitResult] = (0, import_react6.useState)(true);
+    var codeRef = (0, import_react6.useRef)("");
+    return /* @__PURE__ */ jsx(AlertModal, {
+      title: "Evaluate JavaScript",
+      extraContent: /* @__PURE__ */ jsxs(Stack, {
+        children: [
+          /* @__PURE__ */ jsx(TextArea, {
+            autoFocus: true,
+            label: "Code",
+            size: "md",
+            placeholder: "ReactNative.NativeModules.BundleUpdaterManager.reload()",
+            onChange: (v2) => codeRef.current = v2
+          }),
+          /* @__PURE__ */ jsx(TableRowGroup, {
+            children: /* @__PURE__ */ jsx(TableSwitchRow, {
+              label: "Await result",
+              value: evalAwaitResult,
+              onValueChange: (v2) => setEvalAwaitResult(v2)
+            })
+          })
+        ]
+      }),
+      actions: /* @__PURE__ */ jsxs(Stack, {
+        children: [
+          /* @__PURE__ */ jsx(AlertActionButton, {
+            text: "Evaluate",
+            variant: "primary",
+            onPress: /* @__PURE__ */ _async_to_generator(function* () {
+              var res = globalThis.eval(codeRef.current);
+              alert(modules3.findProp("inspect")(res instanceof Promise && evalAwaitResult ? yield res : res, {
+                depth: 5
+              }));
+            })
+          }),
+          /* @__PURE__ */ jsx(AlertActionButton, {
+            text: "Cancel",
+            variant: "secondary"
+          })
+        ]
+      })
+    });
+  }
+  var import_react_native11, import_react6;
   var init_Developer = __esm({
     "src/plugins/developer-settings/pages/Developer.tsx"() {
       "use strict";
@@ -4522,30 +5141,59 @@ Type: ${asset.type}`,
       init_src6();
       init_Wrapper();
       init_devtools();
+      init_debugger();
       init_src7();
-      import_react_native9 = __toESM(require_react_native(), 1);
+      import_react_native11 = __toESM(require_react_native(), 1);
       init_developer_settings();
+      import_react6 = __toESM(require_react(), 1);
+      init_paths();
     }
   });
 
   // src/plugins/developer-settings/index.tsx
-  var plugin, PluginContext;
+  function setupDebugger({ patcher: patcher6, cleanup }) {
+    var debuggerCleanups = /* @__PURE__ */ new Set();
+    patcher6.before(globalThis, "nativeLoggingHook", ([message, level]) => {
+      if (DebuggerContext.ws?.readyState === WebSocket.OPEN) DebuggerContext.ws.send(JSON.stringify({
+        level: level === 3 ? "error" : level === 2 ? "warn" : "info",
+        message
+      }));
+    }, "loggerPatch");
+    globalThis.dbgr = {
+      reload: () => BundleUpdaterManager.reload(),
+      patcher: {
+        snipe: (object, key, callback) => debuggerCleanups.add(patcher6.after(object, key, callback ?? ((args, ret) => console.log("[SNIPER]", args, ret)), "revenge.plugins.developer-settings.debugger.patcher.snipe")),
+        noop: (object, key) => debuggerCleanups.add(patcher6.instead(object, key, () => void 0, "revenge.plugins.developer-settings.debugger.patcher.noop")),
+        wipe: () => {
+          for (var c2 of debuggerCleanups) c2();
+          debuggerCleanups.clear();
+        }
+      }
+    };
+    cleanup(
+      // biome-ignore lint/performance/noDelete: This happens once
+      () => delete globalThis.dbgr,
+      () => {
+        for (var c2 of debuggerCleanups) c2();
+      }
+    );
+  }
+  var plugin2, PluginContext2;
   var init_developer_settings = __esm({
     "src/plugins/developer-settings/index.tsx"() {
       "use strict";
       init_async_to_generator();
       init_react_jsx_runtime();
       init_common();
-      init_components();
       init_internals();
-      init_src6();
       init_functions();
-      init_Revenge();
       init_AssetBrowser();
       init_DebugPerformanceTimes();
       init_Developer();
+      init_debugger();
       init_devtools();
-      plugin = registerPlugin({
+      init_native();
+      plugin2 = registerPlugin({
         name: "Developer Settings",
         author: "Revenge",
         description: "Developer settings for Revenge",
@@ -4554,9 +5202,9 @@ Type: ${asset.type}`,
         icon: "WrenchIcon",
         afterAppRender(context) {
           return _async_to_generator(function* () {
-            var { cleanup, storage, revenge: { assets: assets2, ui: { settings: sui } } } = context;
+            var { cleanup, storage, revenge: { assets, ui: { settings: sui } } } = context;
             function wrapPluginContext(Component) {
-              return () => /* @__PURE__ */ jsx(PluginContext.Provider, {
+              return () => /* @__PURE__ */ jsx(PluginContext2.Provider, {
                 value: context,
                 children: /* @__PURE__ */ jsx(Component, {})
               });
@@ -4571,49 +5219,41 @@ ${err.message}`
               content: "Connected to React DevTools"
             }));
             if (storage.reactDevTools.autoConnect && globalThis.__reactDevTools) connectToDevTools(storage.reactDevTools.address);
+            if (storage.debugger.autoConnect) connectToDebugger(storage.debugger.address, context.revenge);
+            setupDebugger(context);
             yield sleep(0);
             cleanup(sui.addRowsToSection("Revenge", {
               RevengeDeveloper: {
                 type: "route",
                 label: "Developer",
-                icon: assets2.getIndexByName("WrenchIcon"),
-                component: wrapPluginContext(DeveloperSettingsPage),
-                predicate: () => storage.settingsRowShown
+                icon: assets.getIndexByName("WrenchIcon"),
+                component: wrapPluginContext(DeveloperSettingsPage)
               }
             }), sui.createRoute("RevengeDebugPerformanceTimes", {
               type: "route",
               label: "Debug Performance Times",
               component: DebugPerformanceTimesSettingsPage,
-              icon: assets2.getIndexByName("TimerIcon")
+              icon: assets.getIndexByName("TimerIcon")
             }), sui.createRoute("RevengeAssetBrowser", {
               type: "route",
               label: "Asset Browser",
               component: AssetBrowserSettingsPage,
-              icon: assets2.getIndexByName("ImageIcon")
-            }), addTableRowsToAdvancedSectionInRevengePage(() => {
-              useObservable([
-                storage
-              ]);
-              return /* @__PURE__ */ jsx(TableSwitchRow, {
-                label: "Show Developer Options",
-                icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                  source: assets2.getIndexByName("WrenchIcon")
-                }),
-                value: storage.settingsRowShown,
-                onValueChange: (v2) => storage.settingsRowShown = v2
-              });
+              icon: assets.getIndexByName("ImageIcon")
             }));
           })();
         },
         initializeStorage: () => ({
-          settingsRowShown: false,
           reactDevTools: {
             address: "localhost:8097",
+            autoConnect: false
+          },
+          debugger: {
+            address: "localhost:9090",
             autoConnect: false
           }
         })
       }, true, true);
-      PluginContext = React.createContext(null);
+      PluginContext2 = React.createContext(null);
     }
   });
 
@@ -4625,48 +5265,45 @@ ${err.message}`
       init_common();
       init_native();
       init_internals();
-      MinimumSupportedBuildNumber = ReactNative.Platform.select({
+      MinimumSupportedBuildNumber = ReactNative2.Platform.select({
         android: 254e3,
         ios: 66559
       });
-      registerPlugin(
-        {
-          name: "Warnings",
-          author: "Revenge",
-          description: "Startup warnings for users that are not using the recommended defaults for Revenge",
-          id: "revenge.warnings",
-          version: "1.0.0",
-          icon: "WarningIcon",
-          afterAppRender({ revenge: { assets: assets2, modules: modules3 }, storage }) {
-            var { legacy_alerts: legacy_alerts2, toasts: toasts2 } = modules3.common;
-            if ((storage.supportWarningDismissedAt ?? Date.now()) + 6048e5 > Date.now()) {
-              legacy_alerts2.show({
-                title: "Support Warning",
-                body: (
-                  // biome-ignore lint/style/useTemplate: I can't see the whole message when not doing concatenation
-                  `Revenge does not officially support this build of Discord. Please update to a newer version as some features may not work as expected.
+      registerPlugin({
+        name: "Warnings",
+        author: "Revenge",
+        description: "Startup warnings for users that are not using the recommended defaults for Revenge",
+        id: "revenge.warnings",
+        version: "1.0.0",
+        icon: "WarningIcon",
+        afterAppRender({ revenge: { assets, modules: modules3 }, storage }) {
+          var { legacy_alerts: legacy_alerts2, toasts: toasts2 } = modules3.common;
+          if (
+            // We do !> instead of < in case the value of the left is NaN
+            !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber) && (storage.supportWarningDismissedAt ?? Date.now()) + 6048e5 > Date.now()
+          ) {
+            legacy_alerts2.show({
+              title: "Support Warning",
+              body: (
+                // biome-ignore lint/style/useTemplate: I can't see the whole message when not doing concatenation
+                `Revenge does not officially support this build of Discord. Please update to a newer version as some features may not work as expected.
 
 Supported Builds: 254.0 (${MinimumSupportedBuildNumber}) or after
 Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
-                ),
-                confirmText: "Remind me in 7 days",
-                onConfirm: () => {
-                  storage.supportWarningDismissedAt = Date.now();
-                  toasts2.open({
-                    key: "revenge.toasts.warnings.support-warning.dismissed",
-                    content: "You will see this warning again in 7 days",
-                    icon: assets2.getIndexByName("ic_warning_24px")
-                  });
-                }
-              });
-            }
+              ),
+              confirmText: "Remind me in 7 days",
+              onConfirm: () => {
+                storage.supportWarningDismissedAt = Date.now();
+                toasts2.open({
+                  key: "revenge.toasts.warnings.support-warning.dismissed",
+                  content: "You will see this warning again in 7 days",
+                  icon: assets.getIndexByName("ic_warning_24px")
+                });
+              }
+            });
           }
-        },
-        true,
-        false,
-        // We do !> instead of < in case the value of the left is NaN
-        () => !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber)
-      );
+        }
+      }, true, false);
     }
   });
 
@@ -4713,7 +5350,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           Promise.resolve().then(() => (init_jsx(), jsx_exports))
         ]);
         var ModulesLibrary = yield ModulesLibraryPromise;
-        var [{ PluginsLibrary: PluginsLibrary2, startCorePlugins: startCorePlugins2, startPluginsMetroModuleSubscriptions: startCorePluginsMetroModuleSubscriptions }, { awaitStorage: awaitStorage2 }, PreferencesLibrary] = yield Promise.all([
+        var [{ startCorePlugins: startCorePlugins2, startPluginsMetroModuleSubscriptions: startCorePluginsMetroModuleSubscriptions }, { awaitStorage: awaitStorage2 }, { settings: settings2, pluginsStates: pluginsStates2 }] = yield Promise.all([
           Promise.resolve().then(() => (init_src8(), src_exports6)),
           Promise.resolve().then(() => (init_src6(), src_exports4)),
           Promise.resolve().then(() => (init_src7(), src_exports5))
@@ -4722,7 +5359,6 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           app: AppLibrary2,
           assets: AssetsLibrary2,
           modules: ModulesLibrary,
-          plugins: PluginsLibrary2,
           react: {
             jsx: ReactJSXLibrary2
           },
@@ -4733,7 +5369,6 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         };
         yield Promise.resolve().then(() => (init_plugins(), plugins_exports));
         recordTimestamp("Plugins_CoreImported");
-        var { settings: settings2, pluginsStates: pluginsStates2 } = yield PreferencesLibrary;
         yield awaitStorage2(settings2, pluginsStates2);
         recordTimestamp("Storage_Initialized");
         startCorePluginsMetroModuleSubscriptions();

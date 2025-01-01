@@ -1987,7 +1987,7 @@
                 "local",
                 " (",
                 "f2f1365",
-                false ? "-dirty" : "",
+                true ? "-dirty" : "",
                 ")"
               ]
             })
@@ -6901,7 +6901,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               {
                 label: "Revenge",
                 icon: "Revenge.RevengeIcon",
-                trailing: `${"local"} (${"f2f1365"}${false ? "-dirty" : ""})`
+                trailing: `${"local"} (${"f2f1365"}${true ? "-dirty" : ""})`
               },
               {
                 label: "Discord",
@@ -16755,6 +16755,95 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     }
   });
 
+  // src/plugins/palmdevs/messages-tab/index.tsx
+  var ScreenName;
+  var init_messages_tab = __esm({
+    "src/plugins/palmdevs/messages-tab/index.tsx"() {
+      "use strict";
+      init_react_jsx_runtime();
+      init_internals();
+      init_lazy();
+      ScreenName = "palmdevs.messages-tab.messages";
+      registerPlugin({
+        name: "Messages Tab",
+        author: "Palm",
+        description: "Brings the messages tab back",
+        id: "palmdevs.messages-tab",
+        version: "1.0.0",
+        icon: "ic_message"
+      }, {
+        beforeAppRender({ patcher: patcher6, revenge: { modules: modules3 } }) {
+          var Messages = modules3.findByFilePath("modules/main_tabs_v2/native/tabs/messages/Messages.tsx", true);
+          var useTabBarTabOptions = modules3.findByName("useTabBarTabOptions");
+          var SelectedGuildStore = revenge.modules.findByProps("getLastSelectedGuildId");
+          var RouterUtils = modules3.findByProps("transitionTo");
+          var NavigationBottomTabs = modules3.findByProps("createBottomTabNavigator");
+          var navigation;
+          patcher6.after(NavigationBottomTabs, "createBottomTabNavigator", (_3, Tab) => {
+            patcher6.before(Tab, "Navigator", ([props]) => {
+              var screens = props.children.props.children;
+              var origTabBar = props.tabBar;
+              props.tabBar = (tbProps) => {
+                navigation = tbProps.navigation;
+                return origTabBar(tbProps);
+              };
+              var tabBarTabOptions = useTabBarTabOptions();
+              if (!screens.some((screen) => screen?.props?.name === ScreenName)) screens.splice(1, 0, /* @__PURE__ */ jsx(Tab.Screen, {
+                options: tabBarTabOptions.messages({
+                  navigation: lazyValue(() => navigation)
+                }),
+                name: ScreenName,
+                component: () => Messages.type({
+                  renderedViaPlugin: true
+                })
+              }));
+            });
+          });
+          patcher6.instead(Messages, "type", ([props], orig) => {
+            if (props.renderedViaPlugin) return orig(props);
+            setImmediate(() => {
+              var lastSelectedGuildId = SelectedGuildStore.getLastSelectedGuildId();
+              RouterUtils.transitionToGuild(lastSelectedGuildId);
+              navigation.navigate(ScreenName);
+            });
+            return null;
+          });
+          patcher6.instead(RouterUtils, "transitionTo", ([path, opts], orig) => {
+            if (path.startsWith("/channels/@me")) {
+              if (opts?.navigationReplace) navigation.navigate(ScreenName);
+              if (opts?.openChannel) orig(path, {
+                navigationReplace: false,
+                openChannel: opts?.openChannel ?? true
+              });
+            } else orig(path, opts);
+          });
+          patcher6.instead(modules3.findProp("Messages", "DragPreview"), "type", () => null);
+        }
+      });
+    }
+  });
+
+  // src/plugins/palmdevs/restore-devices-setting/index.ts
+  var init_restore_devices_setting = __esm({
+    "src/plugins/palmdevs/restore-devices-setting/index.ts"() {
+      "use strict";
+      init_internals();
+      registerPlugin({
+        name: "Restore Devices Setting",
+        author: "Palm",
+        description: "Brings the Devices settings page back",
+        id: "palmdevs.restore-devices-setting",
+        version: "1.0.0",
+        icon: "LaptopPhoneIcon"
+      }, {
+        beforeAppRender({ patcher: patcher6, revenge: { modules: modules3 } }) {
+          var DevicesSetting = modules3.findByFilePath("modules/main_tabs_v2/native/settings/definitions/DevicesSetting.tsx", true);
+          patcher6.instead(DevicesSetting, "usePredicate", () => true);
+        }
+      });
+    }
+  });
+
   // src/plugins/index.ts
   var plugins_exports = {};
   var init_plugins = __esm({
@@ -16765,6 +16854,8 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_staff_settings();
       init_developer_settings();
       init_warnings();
+      init_messages_tab();
+      init_restore_devices_setting();
     }
   });
 

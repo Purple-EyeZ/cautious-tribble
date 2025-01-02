@@ -5524,16 +5524,19 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             try {
               var result = intl?.t?.[key]?.()?.reserialize() || key;
               console.log(`[QuickDelete] Key "${key}" translated to "${result}"`);
-              return result;
+              if (result === key) {
+                console.warn(`[QuickDelete] No translation found for key: "${key}"`);
+              }
+              return result.toLowerCase();
             } catch (err) {
               console.error(`[QuickDelete] Error translating key "${key}":`, err);
-              return key;
+              return key.toLowerCase();
             }
           };
           var formattedTitles = autoConfirmTitles.map(getFormattedTitle);
           console.log("[QuickDelete] Formatted titles:", formattedTitles);
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
-            var title = args?.[0]?.title;
+            var title = args?.[0]?.title?.toLowerCase();
             console.log("[QuickDelete] Popup shown with title:", title);
             if (formattedTitles.includes(title)) {
               console.log(`[QuickDelete] Auto-confirming popup with title: ${title}`);

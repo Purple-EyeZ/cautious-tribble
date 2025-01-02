@@ -5510,33 +5510,40 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.0",
         icon: "EyeIcon",
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup }) {
+          console.log("[QuickDelete] Plugin loaded");
           var Popup = modules3.findByProps("show", "openLazy");
-          if (!Popup) return;
+          if (!Popup) {
+            console.error("[QuickDelete] Popup module not found");
+            return;
+          }
           var autoConfirmTitles = [
             "DELETE_MESSAGE",
             "SUPPRESS_EMBED_TITLE"
           ];
           var getFormattedTitle = (key) => {
             try {
-              return intl?.t?.[key]?.()?.reserialize() || key;
-            } catch (e) {
+              var result = intl?.t?.[key]?.()?.reserialize() || key;
+              console.log(`[QuickDelete] Key "${key}" translated to "${result}"`);
+              return result;
+            } catch (err) {
+              console.error(`[QuickDelete] Error translating key "${key}":`, err);
               return key;
             }
           };
-          var formattedTitles = autoConfirmTitles.map((key) => {
-            var formatted = getFormattedTitle(key);
-            console.log(`Key: ${key}, Formatted: ${formatted}`);
-            return formatted;
-          });
+          var formattedTitles = autoConfirmTitles.map(getFormattedTitle);
+          console.log("[QuickDelete] Formatted titles:", formattedTitles);
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
             var title = args?.[0]?.title;
+            console.log("[QuickDelete] Popup shown with title:", title);
             if (formattedTitles.includes(title)) {
-              console.log(`Auto-confirming popup with title: ${title}`);
+              console.log(`[QuickDelete] Auto-confirming popup with title: ${title}`);
               args[0].onConfirm?.();
             } else {
+              console.log("[QuickDelete] Popup not auto-confirmed.");
               original.apply(this, args);
             }
           }, "Popup.show"));
+          console.log("[QuickDelete] Patcher applied");
         }
       }, true, true);
     }

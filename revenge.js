@@ -5489,18 +5489,18 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         icon: "EyeIcon",
         beforeAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
           var Typing = modules3.findByProps("startTyping", "stopTyping");
-          cleanup(patcher6.instead(Typing.startTyping, "startTyping", () => {
-            if (storage.blockTyping) {
-              return Promise.resolve();
-            }
-            return Typing.startTyping.apply(this, arguments);
-          }, "startTyping"));
-          cleanup(patcher6.instead(Typing.stopTyping, "stopTyping", () => {
-            if (storage.blockTyping) {
-              return Promise.resolve();
-            }
-            return Typing.stopTyping.apply(this, arguments);
-          }, "stopTyping"));
+          if (Typing?.startTyping && Typing?.stopTyping) {
+            cleanup(patcher6.instead(Typing.startTyping, "startTyping", () => {
+              if (storage.blockTyping) return Promise.resolve();
+              return Typing.startTyping.apply(this, arguments);
+            }));
+            cleanup(patcher6.instead(Typing.stopTyping, "stopTyping", () => {
+              if (storage.blockTyping) return Promise.resolve();
+              return Typing.stopTyping.apply(this, arguments);
+            }));
+          } else {
+            console.error("Typing module or methods not found");
+          }
         },
         initializeStorage() {
           return {

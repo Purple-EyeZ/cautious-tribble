@@ -5475,12 +5475,12 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       "use strict";
       init_internals();
       registerPlugin({
-        name: "No Typing Indicator",
+        name: "Silent Typing",
         author: "Purple_\u039Eye\u2122",
         description: "Disables typing indicator when you type.",
-        id: "vengeance.notyping",
+        id: "vengeance.silenttyping",
         version: "1.0.0",
-        beforeAppRender({ patcher: patcher6, cleanup, revenge: revenge2 }) {
+        afterAppRender({ patcher: patcher6, cleanup, revenge: revenge2 }) {
           console.log("[NoTyping] Modules disponibles :", revenge2.modules);
           var Typing = revenge2.modules.findByProps("startTyping", "stopTyping");
           console.log("[NoTyping] Typing module:", Typing);

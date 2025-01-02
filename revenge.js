@@ -5501,7 +5501,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             patches.forEach((unpatch2) => unpatch2());
           });
         }
-      });
+      }, true);
     }
   });
 

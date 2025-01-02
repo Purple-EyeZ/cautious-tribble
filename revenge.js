@@ -5479,7 +5479,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         author: "YourName",
         description: "Disables typing indicators in Discord.",
         id: "vengeance.notyping",
-        version: "1.0.0",
+        version: "1.0.1",
         beforeAppRender({ patcher: patcher6, cleanup, revenge: revenge2 }) {
           console.log("[NoTyping] Modules disponibles :", revenge2.modules);
           var Typing = revenge2.modules.findByProps("startTyping", "stopTyping");
@@ -5491,12 +5491,17 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           var patches = [
             "startTyping",
             "stopTyping"
-          ].map((method) => patcher6.instead(Typing, method, () => {
-            console.log(`[NoTyping] Appel\xE9 : ${method}`);
+          ].map((method) => patcher6.instead(Typing, method, (...args) => {
+            console.log(`[NoTyping] Appel\xE9 : ${method} avec les arguments :`, args);
+            return;
           }));
-          cleanup(() => patches.forEach((unpatch2) => unpatch2()));
+          console.log("[NoTyping] Patches appliqu\xE9s :", patches);
+          cleanup(() => {
+            console.log("[NoTyping] Nettoyage des patchs...");
+            patches.forEach((unpatch2) => unpatch2());
+          });
         }
-      }, true);
+      });
     }
   });
 

@@ -6,16 +6,10 @@
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __require = /* @__PURE__ */ ((x2) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x2, {
-    get: (a, b3) => (typeof require !== "undefined" ? require : a)[b3]
-  }) : x2)(function(x2) {
-    if (typeof require !== "undefined") return require.apply(this, arguments);
-    throw Error('Dynamic require of "' + x2 + '" is not supported');
-  });
   var __esm = (fn, res) => function __init() {
     return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
   };
-  var __commonJS = (cb, mod) => function __require2() {
+  var __commonJS = (cb, mod) => function __require() {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
   var __export = (target, all) => {
@@ -5476,101 +5470,29 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/notyping/index.tsx
-  var import_react_native13;
   var init_notyping = __esm({
     "src/plugins/vengeance/notyping/index.tsx"() {
       "use strict";
-      init_react_jsx_runtime();
-      init_src5();
       init_internals();
-      init_src6();
-      import_react_native13 = __toESM(require_react_native(), 1);
-      init_components();
       registerPlugin({
         name: "NoTyping",
-        author: "Vengeance",
-        description: "Disables typing indicators in Discord",
+        author: "YourName",
+        description: "Disables typing indicators in Discord.",
         id: "vengeance.notyping",
         version: "1.0.0",
-        icon: "EyeIcon",
-        beforeAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
-          var Typing = modules3.findByProps("startTyping", "stopTyping");
-          if (Typing?.startTyping && Typing?.stopTyping) {
-            cleanup(patcher6.instead(Typing.startTyping, "startTyping", () => {
-              if (storage.blockTyping) return Promise.resolve();
-              return Typing.startTyping.apply(this, arguments);
-            }));
-            cleanup(patcher6.instead(Typing.stopTyping, "stopTyping", () => {
-              if (storage.blockTyping) return Promise.resolve();
-              return Typing.stopTyping.apply(this, arguments);
-            }));
-          } else {
-            console.error("Typing module or methods not found");
+        beforeAppRender({ patcher: patcher6, cleanup, revenge: revenge2 }) {
+          console.log("[NoTyping] Modules disponibles :", revenge2.modules);
+          var Typing = revenge2.modules.findByProps("startTyping", "stopTyping");
+          if (!Typing) {
+            console.error("[NoTyping] Typing module not found!");
+            return;
           }
-        },
-        initializeStorage() {
-          return {
-            blockTyping: true
-          };
-        },
-        SettingsComponent({ storage }) {
-          useObservable([
-            storage
-          ]);
-          return /* @__PURE__ */ jsxs(import_react_native13.ScrollView, {
-            children: [
-              /* @__PURE__ */ jsx(Card, {
-                children: /* @__PURE__ */ jsxs(Text, {
-                  variant: "text-md/medium",
-                  children: [
-                    "Typing indicators are ",
-                    storage.blockTyping ? "disabled" : "enabled",
-                    "."
-                  ]
-                })
-              }),
-              /* @__PURE__ */ jsx(TableRowGroup, {
-                title: "Settings",
-                children: /* @__PURE__ */ jsx(TableSwitchRow, {
-                  label: "Block Typing Indicators",
-                  subLabel: "Disables typing indicators when you are typing",
-                  icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                    source: getAssetIndexByName("BeakerIcon")
-                  }),
-                  value: storage.blockTyping,
-                  onValueChange: (v2) => storage.blockTyping = v2
-                })
-              })
-            ]
-          });
-        }
-      }, true, true, void 0, true);
-    }
-  });
-
-  // src/plugins/vengeance/testing/index.ts
-  var import_metro8;
-  var init_testing = __esm({
-    "src/plugins/vengeance/testing/index.ts"() {
-      "use strict";
-      init_internals();
-      import_metro8 = __require("@revenge-mod/metro");
-      registerPlugin({
-        name: "Testing",
-        author: "YourName",
-        description: "A testing plugin to inspect available properties in Revenge.",
-        id: "testing.plugin",
-        version: "1.0.0",
-        beforeAppRender() {
-          try {
-            var Typing = (0, import_metro8.findByProps)("startTyping", "stopTyping");
-            console.log("[Testing Plugin] Typing module:", Typing);
-            if (!Typing) {
-              console.warn("[Testing Plugin] Typing module not found!");
-            }
-          } catch (error) {
-            console.error("[Testing Plugin] Error:", error);
-          }
+          var patches = [
+            "startTyping",
+            "stopTyping"
+          ].map((method) => patcher6.instead(Typing, method, () => {
+          }));
+          cleanup(() => patches.forEach((unpatch2) => unpatch2()));
         }
       }, true);
     }
@@ -5995,7 +5917,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       return row;
     }, "realify.RowGenerator"), patcher6.before(
       // biome-ignore lint/suspicious/noExplicitAny: View typings arent really accurate
-      import_react_native14.View,
+      import_react_native13.View,
       "render",
       (args) => {
         var props = args?.[0];
@@ -6017,12 +5939,12 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       }
     }, "realify.StickerDetailActionSheet"));
   }
-  var import_react_native14, cdnLinks, emojiUrlRegex, stickerUrlRegex, attachmentUrlRegex, isFakerAlt, shouldDebug;
+  var import_react_native13, cdnLinks, emojiUrlRegex, stickerUrlRegex, attachmentUrlRegex, isFakerAlt, shouldDebug;
   var init_realify = __esm({
     "src/plugins/vengeance/freenitro/patches/realify.tsx"() {
       "use strict";
       init_debugger();
-      import_react_native14 = __toESM(require_react_native(), 1);
+      import_react_native13 = __toESM(require_react_native(), 1);
       cdnLinks = [
         "cdn.discordapp.com",
         "media.discordapp.net"
@@ -6036,7 +5958,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/freenitro/index.tsx
-  var import_react_native15, emojiSizeLadder, stickerSizeLadder, useSettingsStyles, plugin3;
+  var import_react_native14, emojiSizeLadder, stickerSizeLadder, useSettingsStyles, plugin3;
   var init_freenitro = __esm({
     "src/plugins/vengeance/freenitro/index.tsx"() {
       "use strict";
@@ -6046,7 +5968,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_src6();
       init_internals();
       init_Wrapper();
-      import_react_native15 = __toESM(require_react_native(), 1);
+      import_react_native14 = __toESM(require_react_native(), 1);
       init_common();
       init_colors();
       init_appIcons();
@@ -6154,7 +6076,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             storage
           ]);
           var settingsStyles = useSettingsStyles();
-          return /* @__PURE__ */ jsx(import_react_native15.ScrollView, {
+          return /* @__PURE__ */ jsx(import_react_native14.ScrollView, {
             children: /* @__PURE__ */ jsxs(PageWrapper, {
               children: [
                 /* @__PURE__ */ jsxs(TableRowGroup, {
@@ -6211,7 +6133,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                         children: storage.emoji.size
                       })
                     }),
-                    /* @__PURE__ */ jsx(import_react_native15.View, {
+                    /* @__PURE__ */ jsx(import_react_native14.View, {
                       style: settingsStyles.slider,
                       children: /* @__PURE__ */ jsx(Slider, {
                         value: emojiSizeLadder.indexOf(storage.emoji.size) + 1,
@@ -6255,7 +6177,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                         children: storage.stickers.size
                       })
                     }),
-                    /* @__PURE__ */ jsx(import_react_native15.View, {
+                    /* @__PURE__ */ jsx(import_react_native14.View, {
                       style: settingsStyles.slider,
                       children: /* @__PURE__ */ jsx(Slider, {
                         value: stickerSizeLadder.indexOf(storage.stickers.size) + 1,
@@ -6305,7 +6227,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                     })
                   ]
                 }),
-                /* @__PURE__ */ jsx(import_react_native15.View, {
+                /* @__PURE__ */ jsx(import_react_native14.View, {
                   style: {
                     height: 12
                   }
@@ -6333,7 +6255,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           direction: "horizontal",
           spacing: 8,
           children: [
-            /* @__PURE__ */ jsx(import_react_native16.Image, {
+            /* @__PURE__ */ jsx(import_react_native15.Image, {
               source: (pluh.icon && getAssetIndexByName(pluh.icon)) ?? getAssetIndexByName("UnknownGameIcon"),
               style: styles7.icon
             }),
@@ -6374,7 +6296,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       })
     });
   }
-  var import_react_native16, useAlertStyles;
+  var import_react_native15, useAlertStyles;
   var init_newplugins = __esm({
     "src/plugins/vengeance/newplugins/index.tsx"() {
       "use strict";
@@ -6384,7 +6306,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_components();
       init_internals();
       init_colors();
-      import_react_native16 = __toESM(require_react_native(), 1);
+      import_react_native15 = __toESM(require_react_native(), 1);
       registerPlugin({
         name: "Plugin Notifier",
         author: "Vengeance",
@@ -6457,11 +6379,11 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/commands/cmds/debug.ts
-  var import_react_native17, MinimumSupportedBuildNumber2, getDeviceInfo, getDeviceManufacturer, debug_default;
+  var import_react_native16, MinimumSupportedBuildNumber2, getDeviceInfo, getDeviceManufacturer, debug_default;
   var init_debug = __esm({
     "src/plugins/vengeance/commands/cmds/debug.ts"() {
       "use strict";
-      import_react_native17 = __toESM(require_react_native(), 1);
+      import_react_native16 = __toESM(require_react_native(), 1);
       init_common();
       init_finders();
       init_native();
@@ -6486,7 +6408,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         execute([ephemeral], ctx) {
           var isOutdated = !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber2);
           var runtimeProps = HermesInternal.getRuntimeProperties();
-          var PlatformConstants = import_react_native17.Platform.constants;
+          var PlatformConstants = import_react_native16.Platform.constants;
           var content = [
             "**Vengeance Debug**",
             `> **Vengeance:** ${"a450326"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
@@ -6550,7 +6472,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/commands/cmds/venfetch.ts
-  var import_react_native18, MinimumSupportedBuildNumber3, getDeviceInfo2, getDeviceManufacturer2, getCurrentUser, message, prime, colorRange, venfetch_default;
+  var import_react_native17, MinimumSupportedBuildNumber3, getDeviceInfo2, getDeviceManufacturer2, getCurrentUser, message, prime, colorRange, venfetch_default;
   var init_venfetch = __esm({
     "src/plugins/vengeance/commands/cmds/venfetch.ts"() {
       "use strict";
@@ -6558,7 +6480,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_common();
       init_commands();
       init_internals();
-      import_react_native18 = __toESM(require_react_native(), 1);
+      import_react_native17 = __toESM(require_react_native(), 1);
       init_finders();
       init_native();
       MinimumSupportedBuildNumber3 = ReactNative.Platform.select({
@@ -6605,7 +6527,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         execute(args, ctx) {
           var ephemeral = args.find((a) => a.name === "ephemeral");
           var color = args.find((a) => a.name === "color");
-          var PlatformConstants = import_react_native18.Platform.constants;
+          var PlatformConstants = import_react_native17.Platform.constants;
           var isOutdated = !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber3);
           var allPlugins = Object.values(plugins);
           var externalPlugins = allPlugins.filter((plugin4) => !plugin4.core && plugin4.enabled);
@@ -6813,7 +6735,6 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       "use strict";
       init_notrack();
       init_notyping();
-      init_testing();
       init_freenitro();
       init_newplugins();
       init_commands2();

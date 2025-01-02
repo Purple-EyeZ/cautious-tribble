@@ -6,10 +6,16 @@
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __require = /* @__PURE__ */ ((x2) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x2, {
+    get: (a, b3) => (typeof require !== "undefined" ? require : a)[b3]
+  }) : x2)(function(x2) {
+    if (typeof require !== "undefined") return require.apply(this, arguments);
+    throw Error('Dynamic require of "' + x2 + '" is not supported');
+  });
   var __esm = (fn, res) => function __init() {
     return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
   };
-  var __commonJS = (cb, mod) => function __require() {
+  var __commonJS = (cb, mod) => function __require2() {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
   var __export = (target, all) => {
@@ -5542,6 +5548,34 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     }
   });
 
+  // src/plugins/vengeance/testing/index.ts
+  var import_metro8;
+  var init_testing = __esm({
+    "src/plugins/vengeance/testing/index.ts"() {
+      "use strict";
+      init_internals();
+      import_metro8 = __require("@revenge-mod/metro");
+      registerPlugin({
+        name: "Testing",
+        author: "YourName",
+        description: "A testing plugin to inspect available properties in Revenge.",
+        id: "testing.plugin",
+        version: "1.0.0",
+        beforeAppRender() {
+          try {
+            var Typing = (0, import_metro8.findByProps)("startTyping", "stopTyping");
+            console.log("[Testing Plugin] Typing module:", Typing);
+            if (!Typing) {
+              console.warn("[Testing Plugin] Typing module not found!");
+            }
+          } catch (error) {
+            console.error("[Testing Plugin] Error:", error);
+          }
+        }
+      }, true);
+    }
+  });
+
   // src/plugins/vengeance/freenitro/patches/extra/appIcons.ts
   function patchAppIcons({ revenge: { modules: modules3 }, storage, patcher: patcher6, cleanup }) {
     var icons = modules3.findByProps("getIcons", "getOfficialAlternateIcons");
@@ -6779,6 +6813,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       "use strict";
       init_notrack();
       init_notyping();
+      init_testing();
       init_freenitro();
       init_newplugins();
       init_commands2();

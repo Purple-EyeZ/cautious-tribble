@@ -5501,6 +5501,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     "src/plugins/vengeance/quickdelete/index.ts"() {
       "use strict";
       init_internals();
+      init_common();
       registerPlugin({
         name: "Quick Delete",
         author: "NAME",
@@ -5515,12 +5516,22 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             "DELETE_MESSAGE",
             "SUPPRESS_EMBED_TITLE"
           ];
-          var intl2 = modules3.findByProps("intl");
-          var getFormattedTitle = (key) => intl2?.t?.[key]?.()?.reserialize();
+          var getFormattedTitle = (key) => {
+            try {
+              return intl?.t?.[key]?.()?.reserialize() || key;
+            } catch (e) {
+              return key;
+            }
+          };
+          var formattedTitles = autoConfirmTitles.map((key) => {
+            var formatted = getFormattedTitle(key);
+            console.log(`Key: ${key}, Formatted: ${formatted}`);
+            return formatted;
+          });
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
             var title = args?.[0]?.title;
-            var formattedTitles = autoConfirmTitles.map(getFormattedTitle);
             if (formattedTitles.includes(title)) {
+              console.log(`Auto-confirming popup with title: ${title}`);
               args[0].onConfirm?.();
             } else {
               original.apply(this, args);

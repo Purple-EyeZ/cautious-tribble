@@ -5494,7 +5494,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           }));
           cleanup(() => patches.forEach((unpatch2) => unpatch2()));
         }
-      }, false);
+      });
     }
   });
 

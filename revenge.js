@@ -5483,6 +5483,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         beforeAppRender({ patcher: patcher6, cleanup, revenge: revenge2 }) {
           console.log("[NoTyping] Modules disponibles :", revenge2.modules);
           var Typing = revenge2.modules.findByProps("startTyping", "stopTyping");
+          console.log("[NoTyping] Typing module:", Typing);
           if (!Typing) {
             console.error("[NoTyping] Typing module not found!");
             return;
@@ -5491,10 +5492,11 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             "startTyping",
             "stopTyping"
           ].map((method) => patcher6.instead(Typing, method, () => {
+            console.log(`[NoTyping] Appel\xE9 : ${method}`);
           }));
           cleanup(() => patches.forEach((unpatch2) => unpatch2()));
         }
-      });
+      }, true);
     }
   });
 

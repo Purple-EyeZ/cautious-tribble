@@ -5533,9 +5533,8 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           var formattedBodies = autoConfirmBodies.map(getFormattedText);
           console.log("[QuickDelete] Formatted bodies:", formattedBodies);
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
-            var { title, body } = args?.[0] || {};
+            var { body } = args?.[0] || {};
             console.log("[QuickDelete] Popup details:", {
-              title,
               body
             });
             var bodyText = body?.toLowerCase();

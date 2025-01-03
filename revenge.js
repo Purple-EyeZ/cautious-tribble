@@ -5520,6 +5520,17 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             "vXZ+Fh",
             "AMvpS0"
           ];
+          var getTranslatedText = (key) => {
+            try {
+              var translation = intl?.t?.[key]?.();
+              var text = translation?.reserialize?.() || "";
+              console.log(`[QuickDelete] Key "${key}" translated to "${text}"`);
+              return text.toLowerCase().trim();
+            } catch (err) {
+              console.error(`[QuickDelete] Error translating key "${key}":`, err);
+              return "";
+            }
+          };
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
             var rawArgs = args?.[0] || {};
             var titleInternal = rawArgs?.children?.props?.title?.toLowerCase().trim();
@@ -5527,15 +5538,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.log("[QuickDelete] Popup arguments (raw):", JSON.stringify(rawArgs, null, 2));
             console.log("[QuickDelete] Internal title:", titleInternal);
             console.log("[QuickDelete] Body text:", bodyText);
-            var translatedBodies = autoConfirmKeys.map((key) => {
-              try {
-                var translation = intl?.t?.[key]?.()?.reserialize();
-                return translation?.toLowerCase().trim();
-              } catch (err) {
-                console.error(`[QuickDelete] Error translating key "${key}":`, err);
-                return null;
-              }
-            }).filter(Boolean);
+            var translatedBodies = autoConfirmKeys.map(getTranslatedText).filter(Boolean);
             console.log("[QuickDelete] Dynamically translated bodies:", translatedBodies);
             if (titleInternal && translatedBodies.includes(titleInternal) || bodyText && translatedBodies.includes(bodyText)) {
               console.log(`[QuickDelete] Auto-confirming popup with text: ${titleInternal || bodyText}`);

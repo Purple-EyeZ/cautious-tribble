@@ -1651,7 +1651,7 @@
     createStyles: () => createStyles,
     dismissAlerts: () => dismissAlerts,
     filePicker: () => filePicker,
-    intl: () => intl2,
+    intl: () => intl,
     intlModule: () => intlModule,
     invites: () => invites,
     legacy_alerts: () => legacy_alerts,
@@ -1665,7 +1665,7 @@
     tokens: () => tokens,
     xxhash64: () => xxhash64
   });
-  var constants, tokens, intl2, intlModule, Logger, legacy_alerts, alerts, channels, links, clipboard, invites, commands, toasts, filePicker, messages, NavigationStack, NavigationNative, TextStyleSheet, createStyles, dismissAlerts, openAlert, Flux, FluxDispatcher, assetsRegistry, React2, ReactNative2, ReactJSXRuntime, semver, xxhash64, nobleHashesUtils, _;
+  var constants, tokens, intl, intlModule, Logger, legacy_alerts, alerts, channels, links, clipboard, invites, commands, toasts, filePicker, messages, NavigationStack, NavigationNative, TextStyleSheet, createStyles, dismissAlerts, openAlert, Flux, FluxDispatcher, assetsRegistry, React2, ReactNative2, ReactJSXRuntime, semver, xxhash64, nobleHashesUtils, _;
   var init_common = __esm({
     "libraries/modules/src/common/index.ts"() {
       "use strict";
@@ -1677,7 +1677,7 @@
       init_deps();
       constants = findByProps("Fonts");
       tokens = findByProps("internal", "colors");
-      intl2 = findByProps("intl");
+      intl = findByProps("intl");
       intlModule = findByProps("runtimeHashMessageKey");
       Logger = findByName("Logger");
       legacy_alerts = findByProps("openLazy", "close");
@@ -5501,6 +5501,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     "src/plugins/vengeance/quickdelete/index.ts"() {
       "use strict";
       init_internals();
+      init_common();
       registerPlugin({
         name: "Quick Delete",
         author: "NAME",

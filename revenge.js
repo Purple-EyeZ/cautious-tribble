@@ -5518,7 +5518,8 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           }
           var autoConfirmTitles = [
             "DELETE_MESSAGE",
-            "SUPPRESS_EMBED_TITLE"
+            "SUPPRESS_EMBED_TITLE",
+            "xwMqDw"
           ];
           var getFormattedTitle = (key) => {
             try {

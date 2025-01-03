@@ -5522,8 +5522,11 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           ];
           var getCurrentTranslations = () => {
             try {
+              var currentLocale = intl?.intl?.locale;
+              console.log("[QuickDelete] Current locale:", currentLocale);
               return autoConfirmKeys.map((key) => {
                 var translation = intl?.t?.[key]?.()?.reserialize() || "";
+                console.log(`[QuickDelete] Key "${key}" translated in "${currentLocale}" to: ${translation}`);
                 return translation.toLowerCase().trim();
               });
             } catch (err) {
@@ -5533,14 +5536,18 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           };
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
             var rawArgs = args?.[0] || {};
-            var titleInternal = rawArgs?.children?.props?.title?.toLowerCase().trim();
-            var bodyText = rawArgs?.body?.toLowerCase().trim();
+            var titleInternal = (rawArgs?.children?.props?.title?.toLowerCase().trim() || "").normalize();
+            var bodyText = (rawArgs?.body?.toLowerCase().trim() || "").normalize();
             console.log("[QuickDelete] Popup arguments (raw):", JSON.stringify(rawArgs, null, 2));
             console.log("[QuickDelete] Internal title:", titleInternal);
             console.log("[QuickDelete] Body text:", bodyText);
             var translatedBodies = getCurrentTranslations();
             console.log("[QuickDelete] Dynamically translated bodies:", translatedBodies);
-            if (titleInternal && translatedBodies.includes(titleInternal) || bodyText && translatedBodies.includes(bodyText)) {
+            var matchTitle = translatedBodies.some((translated) => titleInternal.includes(translated));
+            var matchBody = translatedBodies.some((translated) => bodyText.includes(translated));
+            console.log("[QuickDelete] Match title:", matchTitle);
+            console.log("[QuickDelete] Match body:", matchBody);
+            if (matchTitle || matchBody) {
               console.log(`[QuickDelete] Auto-confirming popup with text: ${titleInternal || bodyText}`);
               rawArgs.onConfirm?.();
               return;

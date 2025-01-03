@@ -1651,7 +1651,7 @@
     createStyles: () => createStyles,
     dismissAlerts: () => dismissAlerts,
     filePicker: () => filePicker,
-    intl: () => intl,
+    intl: () => intl2,
     intlModule: () => intlModule,
     invites: () => invites,
     legacy_alerts: () => legacy_alerts,
@@ -1665,7 +1665,7 @@
     tokens: () => tokens,
     xxhash64: () => xxhash64
   });
-  var constants, tokens, intl, intlModule, Logger, legacy_alerts, alerts, channels, links, clipboard, invites, commands, toasts, filePicker, messages, NavigationStack, NavigationNative, TextStyleSheet, createStyles, dismissAlerts, openAlert, Flux, FluxDispatcher, assetsRegistry, React2, ReactNative2, ReactJSXRuntime, semver, xxhash64, nobleHashesUtils, _;
+  var constants, tokens, intl2, intlModule, Logger, legacy_alerts, alerts, channels, links, clipboard, invites, commands, toasts, filePicker, messages, NavigationStack, NavigationNative, TextStyleSheet, createStyles, dismissAlerts, openAlert, Flux, FluxDispatcher, assetsRegistry, React2, ReactNative2, ReactJSXRuntime, semver, xxhash64, nobleHashesUtils, _;
   var init_common = __esm({
     "libraries/modules/src/common/index.ts"() {
       "use strict";
@@ -1677,7 +1677,7 @@
       init_deps();
       constants = findByProps("Fonts");
       tokens = findByProps("internal", "colors");
-      intl = findByProps("intl");
+      intl2 = findByProps("intl");
       intlModule = findByProps("runtimeHashMessageKey");
       Logger = findByName("Logger");
       legacy_alerts = findByProps("openLazy", "close");
@@ -5501,7 +5501,6 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     "src/plugins/vengeance/quickdelete/index.ts"() {
       "use strict";
       init_internals();
-      init_common();
       registerPlugin({
         name: "Quick Delete",
         author: "NAME",
@@ -5520,15 +5519,15 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             "vXZ+Fh",
             "AMvpS0"
           ];
-          var getTranslatedText = (key) => {
+          var getCurrentTranslations = () => {
             try {
-              var translation = intl?.t?.[key]?.();
-              var text = translation?.reserialize?.() || "";
-              console.log(`[QuickDelete] Key "${key}" translated to "${text}"`);
-              return text.toLowerCase().trim();
+              return autoConfirmKeys.map((key) => {
+                var translation = intl?.t?.[key]?.()?.reserialize() || "";
+                return translation.toLowerCase().trim();
+              });
             } catch (err) {
-              console.error(`[QuickDelete] Error translating key "${key}":`, err);
-              return "";
+              console.error("[QuickDelete] Error fetching translations:", err);
+              return [];
             }
           };
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
@@ -5538,7 +5537,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.log("[QuickDelete] Popup arguments (raw):", JSON.stringify(rawArgs, null, 2));
             console.log("[QuickDelete] Internal title:", titleInternal);
             console.log("[QuickDelete] Body text:", bodyText);
-            var translatedBodies = autoConfirmKeys.map(getTranslatedText).filter(Boolean);
+            var translatedBodies = getCurrentTranslations();
             console.log("[QuickDelete] Dynamically translated bodies:", translatedBodies);
             if (titleInternal && translatedBodies.includes(titleInternal) || bodyText && translatedBodies.includes(bodyText)) {
               console.log(`[QuickDelete] Auto-confirming popup with text: ${titleInternal || bodyText}`);

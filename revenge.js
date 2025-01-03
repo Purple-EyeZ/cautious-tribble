@@ -5516,7 +5516,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.error("[QuickDelete] Popup module not found");
             return;
           }
-          var autoConfirmBodies = [
+          var autoConfirmKeys = [
             "vXZ+Fh",
             "AMvpS0"
           ];
@@ -5530,7 +5530,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
               return key.toLowerCase();
             }
           };
-          var formattedBodies = autoConfirmBodies.map(getFormattedText);
+          var formattedBodies = autoConfirmKeys.map(getFormattedText);
           console.log("[QuickDelete] Formatted bodies:", formattedBodies);
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
             var rawArgs = args?.[0] || {};

@@ -1981,7 +1981,7 @@
                 ") \u2022 Revenge ",
                 "local",
                 " (",
-                "a450326",
+                "e9f48bd",
                 true ? "-dirty" : "",
                 ")"
               ]
@@ -3649,7 +3649,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               {
                 label: "Revenge",
                 icon: "Revenge.RevengeIcon",
-                trailing: `${"local"} (${"a450326"}${true ? "-dirty" : ""})`
+                trailing: `${"local"} (${"e9f48bd"}${true ? "-dirty" : ""})`
               },
               {
                 label: "Discord",
@@ -5533,18 +5533,14 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           var formattedBodies = autoConfirmBodies.map(getFormattedText);
           console.log("[QuickDelete] Formatted bodies:", formattedBodies);
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
-            var { body } = args?.[0] || {};
+            var { title, body, ...rest } = args?.[0] || {};
+            console.log("[QuickDelete] Popup arguments:", args[0]);
             console.log("[QuickDelete] Popup details:", {
-              body
+              title,
+              body,
+              other: rest
             });
-            var bodyText = body?.toLowerCase();
-            if (formattedBodies.includes(bodyText)) {
-              console.log(`[QuickDelete] Auto-confirming popup with body: ${bodyText}`);
-              args[0].onConfirm?.();
-            } else {
-              console.log("[QuickDelete] Popup not auto-confirmed.");
-              original.apply(this, args);
-            }
+            original.apply(this, args);
           }, "Popup.show"));
           console.log("[QuickDelete] Patcher applied");
         }
@@ -6465,7 +6461,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           var PlatformConstants = import_react_native16.Platform.constants;
           var content = [
             "**ReVengeanced Debug**",
-            `> **ReVengeanced:** ${"a450326"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
+            `> **ReVengeanced:** ${"e9f48bd"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
             `> **Discord:** ${ClientInfoModule.Version} (${ClientInfoModule.Build})`,
             `> **React:** ${React.version} (**RN** ${runtimeProps["OSS Release Version"]?.slice(7)})`,
             `> **Hermes:** ${runtimeProps["OSS Release Version"]} (bytecode ${runtimeProps["Bytecode Version"]})`,
@@ -6616,7 +6612,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             keyClr,
             titleClr: baseClr === 0 ? 7 : 0,
             username,
-            title: `${"a450326"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
+            title: `${"e9f48bd"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
             discord: `${ClientInfoModule.Version} (${ClientInfoModule.Build}) ${isOutdated ? "\u26B0" : ""}${ClientInfoModule.ReleaseChannel.includes("canary") ? "\u{1F329}" : ""}`,
             os: `${PlatformConstants.systemName ?? "Android"} ${PlatformConstants.Release ?? PlatformConstants.osVersion}${PlatformConstants.Version ? ` (SDK ${PlatformConstants.Version})` : ""}`,
             device: `${getDeviceInfo2()} (by ${getDeviceManufacturer2()})`,

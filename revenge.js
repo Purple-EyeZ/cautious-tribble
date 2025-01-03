@@ -5517,7 +5517,8 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             return;
           }
           var autoConfirmBodies = [
-            "vXZ+Fh"
+            "vXZ+Fh",
+            "AMvpS0"
           ];
           var getFormattedText = (key) => {
             try {

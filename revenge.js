@@ -5533,13 +5533,23 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           var formattedBodies = autoConfirmBodies.map(getFormattedText);
           console.log("[QuickDelete] Formatted bodies:", formattedBodies);
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
+            console.log("[QuickDelete] Popup arguments (raw):", JSON.stringify(args[0], null, 2));
             var { title, body, ...rest } = args?.[0] || {};
-            console.log("[QuickDelete] Popup arguments:", args[0]);
             console.log("[QuickDelete] Popup details:", {
               title,
               body,
               other: rest
             });
+            if (body) {
+              var bodyText = body.toLowerCase();
+              console.log("[QuickDelete] Body text:", bodyText);
+              if (formattedBodies.includes(bodyText)) {
+                console.log(`[QuickDelete] Auto-confirming popup with body: ${bodyText}`);
+                args[0].onConfirm?.();
+                return;
+              }
+            }
+            console.log("[QuickDelete] Popup not auto-confirmed.");
             original.apply(this, args);
           }, "Popup.show"));
           console.log("[QuickDelete] Patcher applied");

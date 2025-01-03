@@ -5533,12 +5533,15 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           var formattedBodies = autoConfirmBodies.map(getFormattedText);
           console.log("[QuickDelete] Formatted bodies:", formattedBodies);
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
-            console.log("[QuickDelete] Popup arguments (raw):", JSON.stringify(args[0], null, 2));
-            var internalTitle = args?.[0]?.children?.props?.title?.toLowerCase();
-            console.log("[QuickDelete] Internal title:", internalTitle);
-            if (internalTitle && formattedBodies.includes(internalTitle)) {
-              console.log(`[QuickDelete] Auto-confirming popup with body: ${internalTitle}`);
-              args[0].onConfirm?.();
+            var rawArgs = args?.[0] || {};
+            var titleInternal = rawArgs?.children?.props?.title?.toLowerCase();
+            var bodyText = rawArgs?.body?.toLowerCase();
+            console.log("[QuickDelete] Popup arguments (raw):", JSON.stringify(rawArgs, null, 2));
+            console.log("[QuickDelete] Internal title:", titleInternal);
+            console.log("[QuickDelete] Body text:", bodyText);
+            if (titleInternal && formattedBodies.includes(titleInternal) || bodyText && formattedBodies.includes(bodyText)) {
+              console.log(`[QuickDelete] Auto-confirming popup with text: ${titleInternal || bodyText}`);
+              rawArgs.onConfirm?.();
               return;
             }
             console.log("[QuickDelete] Popup not auto-confirmed.");

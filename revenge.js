@@ -5516,31 +5516,30 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.error("[QuickDelete] Popup module not found");
             return;
           }
-          var autoConfirmTitles = [
-            "DELETE_MESSAGE",
-            "SUPPRESS_EMBED_TITLE",
-            "xwMqDw"
+          var autoConfirmBodies = [
+            "vXZ+Fh"
           ];
-          var getFormattedTitle = (key) => {
+          var getFormattedText = (key) => {
             try {
               var result = intl?.t?.[key]?.()?.reserialize() || key;
               console.log(`[QuickDelete] Key "${key}" translated to "${result}"`);
-              if (result === key) {
-                console.warn(`[QuickDelete] No translation found for key: "${key}"`);
-              }
               return result.toLowerCase();
             } catch (err) {
               console.error(`[QuickDelete] Error translating key "${key}":`, err);
               return key.toLowerCase();
             }
           };
-          var formattedTitles = autoConfirmTitles.map(getFormattedTitle);
-          console.log("[QuickDelete] Formatted titles:", formattedTitles);
+          var formattedBodies = autoConfirmBodies.map(getFormattedText);
+          console.log("[QuickDelete] Formatted bodies:", formattedBodies);
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
-            var title = args?.[0]?.title?.toLowerCase();
-            console.log("[QuickDelete] Popup shown with title:", title);
-            if (formattedTitles.includes(title)) {
-              console.log(`[QuickDelete] Auto-confirming popup with title: ${title}`);
+            var { title, body } = args?.[0] || {};
+            console.log("[QuickDelete] Popup details:", {
+              title,
+              body
+            });
+            var bodyText = body?.toLowerCase();
+            if (formattedBodies.includes(bodyText)) {
+              console.log(`[QuickDelete] Auto-confirming popup with body: ${bodyText}`);
               args[0].onConfirm?.();
             } else {
               console.log("[QuickDelete] Popup not auto-confirmed.");

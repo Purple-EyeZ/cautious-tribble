@@ -5520,26 +5520,24 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             "vXZ+Fh",
             "AMvpS0"
           ];
-          var getFormattedText = (key) => {
-            try {
-              var result = intl?.t?.[key]?.()?.reserialize() || key;
-              console.log(`[QuickDelete] Key "${key}" translated to "${result}"`);
-              return result.toLowerCase();
-            } catch (err) {
-              console.error(`[QuickDelete] Error translating key "${key}":`, err);
-              return key.toLowerCase();
-            }
-          };
-          var formattedBodies = autoConfirmKeys.map(getFormattedText);
-          console.log("[QuickDelete] Formatted bodies:", formattedBodies);
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
             var rawArgs = args?.[0] || {};
-            var titleInternal = rawArgs?.children?.props?.title?.toLowerCase();
-            var bodyText = rawArgs?.body?.toLowerCase();
+            var titleInternal = rawArgs?.children?.props?.title?.toLowerCase().trim();
+            var bodyText = rawArgs?.body?.toLowerCase().trim();
             console.log("[QuickDelete] Popup arguments (raw):", JSON.stringify(rawArgs, null, 2));
             console.log("[QuickDelete] Internal title:", titleInternal);
             console.log("[QuickDelete] Body text:", bodyText);
-            if (titleInternal && formattedBodies.includes(titleInternal) || bodyText && formattedBodies.includes(bodyText)) {
+            var translatedBodies = autoConfirmKeys.map((key) => {
+              try {
+                var translation = intl?.t?.[key]?.()?.reserialize();
+                return translation?.toLowerCase().trim();
+              } catch (err) {
+                console.error(`[QuickDelete] Error translating key "${key}":`, err);
+                return null;
+              }
+            }).filter(Boolean);
+            console.log("[QuickDelete] Dynamically translated bodies:", translatedBodies);
+            if (titleInternal && translatedBodies.includes(titleInternal) || bodyText && translatedBodies.includes(bodyText)) {
               console.log(`[QuickDelete] Auto-confirming popup with text: ${titleInternal || bodyText}`);
               rawArgs.onConfirm?.();
               return;

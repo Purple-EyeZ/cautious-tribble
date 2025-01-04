@@ -16887,15 +16887,30 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             "vXZ+Fh",
             "AMvpS0"
           ];
+          var getLocale = () => {
+            try {
+              var settings2 = modules3.findByProps("getLocale", "setLocale");
+              if (settings2) {
+                var locale = settings2.getLocale();
+                console.log("[QuickDelete] Locale found:", locale);
+                return locale;
+              } else {
+                console.warn("[QuickDelete] Locale module not found, using default.");
+                return "en-US";
+              }
+            } catch (err3) {
+              console.error("[QuickDelete] Error fetching locale:", err3);
+              return "en-US";
+            }
+          };
           var getCurrentTranslations = () => {
             try {
+              var locale = getLocale();
               var translations = autoConfirmKeys.map((key) => {
-                var translationObject = intl?.t?.[key]?.();
+                var translationObject = intl?.t?.[key]?.(locale);
                 if (typeof translationObject === "object" && translationObject?.reserialize) {
                   var translation = translationObject.reserialize();
-                  console.log(`[QuickDelete] Key "${key}" translation:`, translation);
-                  console.log("[QuickDelete] intl object:", intl);
-                  console.log("[QuickDelete] intl keys:", Object.keys(intl || {}));
+                  console.log(`[QuickDelete] Key "${key}" translation in "${locale}":`, translation);
                   return translation.toLowerCase().trim();
                 } else {
                   console.warn(`[QuickDelete] Key "${key}" did not return a valid translation object.`);

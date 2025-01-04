@@ -16874,7 +16874,8 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         description: "Auto-confirm popups.",
         id: "vengeance.quickdelete",
         version: "1.0.0",
-        icon: "EyeIcon",
+        icon: "EyeIcon"
+      }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup }) {
           console.log("[QuickDelete] Plugin loaded");
           var Popup = modules3.findByProps("show", "openLazy");
@@ -16923,7 +16924,11 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           }, "Popup.show"));
           console.log("[QuickDelete] Patcher applied");
         }
-      }, true, true);
+      }, {
+        external: false,
+        manageable: true,
+        enabled: true
+      });
     }
   });
 

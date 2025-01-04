@@ -5522,10 +5522,10 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           ];
           var getCurrentTranslations = () => {
             try {
-              var currentLocale = intl?.intl?.locale;
+              var currentLocale = intl?.intl?.locale || "default";
               console.log("[QuickDelete] Current locale:", currentLocale);
               return autoConfirmKeys.map((key) => {
-                var translation = intl?.t?.[key]?.()?.reserialize() || "";
+                var translation = intl?.t?.[key]?.() || "";
                 console.log(`[QuickDelete] Key "${key}" translated in "${currentLocale}" to: ${translation}`);
                 return translation.toLowerCase().trim();
               });

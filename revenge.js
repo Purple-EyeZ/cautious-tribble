@@ -16873,7 +16873,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         author: "NAME",
         description: "Auto-confirm popups.",
         id: "vengeance.quickdelete",
-        version: "1.0.1",
+        version: "1.0.2",
         icon: "EyeIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup }) {
@@ -16887,49 +16887,34 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             "vXZ+Fh",
             "AMvpS0"
           ];
-          var getAppLocale = () => {
+          var translatedBodies = [];
+          var initializeTranslations = () => {
             try {
-              var appLocale = intl?.intl?.currentLocale;
-              if (appLocale) {
-                console.log("[QuickDelete] App locale:", appLocale);
-                return appLocale;
-              } else {
-                console.warn("[QuickDelete] App locale not found, falling back to default.");
-                return "en-US";
-              }
-            } catch (err3) {
-              console.error("[QuickDelete] Error fetching app locale:", err3);
-              return "en-US";
-            }
-          };
-          var getCurrentTranslations = () => {
-            try {
-              var locale = getAppLocale();
-              var translations = autoConfirmKeys.map((key) => {
-                var translationObject = intl?.t?.[key]?.(locale);
+              var appLocale = intl?.intl?.currentLocale || "en-US";
+              console.log("[QuickDelete] App locale:", appLocale);
+              translatedBodies = autoConfirmKeys.map((key) => {
+                var translationObject = intl?.t?.[key]?.(appLocale);
                 if (translationObject && typeof translationObject === "object" && translationObject.reserialize) {
-                  var translation = translationObject.reserialize();
-                  console.log(`[QuickDelete] Key "${key}" translation in "${locale}":`, translation);
-                  return translation.toLowerCase().trim();
+                  var translation = translationObject.reserialize().toLowerCase().trim();
+                  console.log(`[QuickDelete] Key "${key}" translation in "${appLocale}":`, translation);
+                  return translation;
                 } else {
-                  console.warn(`[QuickDelete] Key "${key}" did not return a valid translation object.`);
+                  console.warn(`[QuickDelete] No valid translation found for key: "${key}"`);
                   return "";
                 }
-              });
-              return translations.filter(Boolean);
+              }).filter(Boolean);
+              console.log("[QuickDelete] Finalized translations:", translatedBodies);
             } catch (err3) {
-              console.error("[QuickDelete] Error fetching translations:", err3);
-              return [];
+              console.error("[QuickDelete] Error initializing translations:", err3);
             }
           };
+          initializeTranslations();
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
             var rawArgs = args?.[0] || {};
             var titleInternal = (rawArgs?.children?.props?.title?.toLowerCase().trim() || "").normalize();
             var bodyText = (rawArgs?.body?.toLowerCase().trim() || "").normalize();
             console.log("[QuickDelete] Internal title:", titleInternal);
             console.log("[QuickDelete] Body text:", bodyText);
-            var translatedBodies = getCurrentTranslations();
-            console.log("[QuickDelete] Dynamically translated bodies:", translatedBodies);
             var matchTitle = translatedBodies.some((translated) => titleInternal.includes(translated));
             var matchBody = translatedBodies.some((translated) => bodyText.includes(translated));
             console.log("[QuickDelete] Match title:", matchTitle);

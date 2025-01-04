@@ -16889,13 +16889,20 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           ];
           var getCurrentTranslations = () => {
             try {
-              var currentLocale = intl?.intl?.locale || "default";
-              console.log("[QuickDelete] Current locale:", currentLocale);
-              return autoConfirmKeys.map((key) => {
-                var translation = intl?.t?.[key]?.() || "";
-                console.log(`[QuickDelete] Key "${key}" translated in "${currentLocale}" to: ${translation}`);
-                return translation.toLowerCase().trim();
+              var translations = autoConfirmKeys.map((key) => {
+                var translationObject = intl?.t?.[key]?.();
+                if (typeof translationObject === "object" && translationObject?.reserialize) {
+                  var translation = translationObject.reserialize();
+                  console.log(`[QuickDelete] Key "${key}" translation:`, translation);
+                  console.log("[QuickDelete] intl object:", intl);
+                  console.log("[QuickDelete] intl keys:", Object.keys(intl || {}));
+                  return translation.toLowerCase().trim();
+                } else {
+                  console.warn(`[QuickDelete] Key "${key}" did not return a valid translation object.`);
+                  return "";
+                }
               });
+              return translations.filter(Boolean);
             } catch (err3) {
               console.error("[QuickDelete] Error fetching translations:", err3);
               return [];

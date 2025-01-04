@@ -16873,7 +16873,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         author: "NAME",
         description: "Auto-confirm popups.",
         id: "vengeance.quickdelete",
-        version: "1.0.2",
+        version: "1.0.1",
         icon: "EyeIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup }) {
@@ -16887,42 +16887,54 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             "vXZ+Fh",
             "AMvpS0"
           ];
-          var getRevengeLocale = () => {
+          var getAppLocale = () => {
             try {
-              if (intl && typeof intl.getLocale === "function") {
-                var locale = intl.getLocale();
-                console.log("[QuickDelete] Locale from intl:", locale);
-                return locale;
-              }
-              var settings2 = modules3.findByProps("getLocale", "setLocale");
-              if (settings2) {
-                var locale1 = settings2.getLocale();
-                console.log("[QuickDelete] Revenge app locale from settings:", locale1);
-                return locale1;
+              var appLocale = intl?.intl?.locale;
+              if (appLocale) {
+                console.log("[QuickDelete] App locale:", appLocale);
+                return appLocale;
               } else {
-                console.warn("[QuickDelete] Locale module for Revenge not found, falling back to system locale.");
+                console.warn("[QuickDelete] App locale not found, falling back to system locale.");
                 return null;
               }
             } catch (err3) {
-              console.error("[QuickDelete] Error fetching Revenge locale:", err3);
+              console.error("[QuickDelete] Error fetching app locale:", err3);
               return null;
             }
           };
           var getLocale = () => {
-            var appLocale = getRevengeLocale();
+            var appLocale = getAppLocale();
             if (appLocale) {
               return appLocale;
             }
-            console.warn("[QuickDelete] Falling back to default locale (en-US)");
-            return "en-US";
+            try {
+              var settings2 = modules3.findByProps("getLocale", "setLocale");
+              if (settings2) {
+                var systemLocale = settings2.getLocale();
+                console.log("[QuickDelete] System locale:", systemLocale);
+                return systemLocale;
+              } else {
+                console.warn("[QuickDelete] Locale module not found, using default.");
+                return "en-US";
+              }
+            } catch (err3) {
+              console.error("[QuickDelete] Error fetching locale:", err3);
+              return "en-US";
+            }
           };
           var getCurrentTranslations = () => {
             try {
               var locale = getLocale();
               var translations = autoConfirmKeys.map((key) => {
-                var translation = intl?.t?.[key]?.(locale);
-                console.log(`[QuickDelete] Key "${key}" translation in "${locale}":`, translation);
-                return (translation || "").toLowerCase().trim();
+                var translationObject = intl?.t?.[key]?.();
+                if (translationObject && typeof translationObject === "object" && translationObject.reserialize) {
+                  var translation = translationObject.reserialize();
+                  console.log(`[QuickDelete] Key "${key}" translation in "${locale}":`, translation);
+                  return translation.toLowerCase().trim();
+                } else {
+                  console.warn(`[QuickDelete] Key "${key}" did not return a valid translation object.`);
+                  return "";
+                }
               });
               return translations.filter(Boolean);
             } catch (err3) {

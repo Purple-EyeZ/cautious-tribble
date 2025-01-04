@@ -16873,7 +16873,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         author: "NAME",
         description: "Auto-confirm popups.",
         id: "vengeance.quickdelete",
-        version: "1.0.1",
+        version: "1.0.2",
         icon: "EyeIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup }) {
@@ -16883,23 +16883,22 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.error("[QuickDelete] Popup module not found");
             return;
           }
-          var localeModule = modules3.findByProps("getLocale", "setLocale", "currentLocale", "appLocale", "Language");
-          if (localeModule) {
-            console.log("[QuickDelete] Locale module found:", localeModule);
-            var appLocale = localeModule.getLocale?.();
-            console.log("[QuickDelete] Locale from app module:", appLocale);
-          }
           var autoConfirmKeys = [
             "vXZ+Fh",
             "AMvpS0"
           ];
           var getRevengeLocale = () => {
             try {
+              if (intl && typeof intl.getLocale === "function") {
+                var locale = intl.getLocale();
+                console.log("[QuickDelete] Locale from intl:", locale);
+                return locale;
+              }
               var settings2 = modules3.findByProps("getLocale", "setLocale");
               if (settings2) {
-                var locale = settings2.getLocale();
-                console.log("[QuickDelete] Revenge app locale:", locale);
-                return locale;
+                var locale1 = settings2.getLocale();
+                console.log("[QuickDelete] Revenge app locale from settings:", locale1);
+                return locale1;
               } else {
                 console.warn("[QuickDelete] Locale module for Revenge not found, falling back to system locale.");
                 return null;
@@ -16910,38 +16909,20 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             }
           };
           var getLocale = () => {
-            var appLocale2 = getRevengeLocale();
-            if (appLocale2) {
-              return appLocale2;
+            var appLocale = getRevengeLocale();
+            if (appLocale) {
+              return appLocale;
             }
-            try {
-              var settings2 = modules3.findByProps("getLocale", "setLocale");
-              if (settings2) {
-                var systemLocale = settings2.getLocale();
-                console.log("[QuickDelete] System locale:", systemLocale);
-                return systemLocale;
-              } else {
-                console.warn("[QuickDelete] Locale module not found, using default.");
-                return "en-US";
-              }
-            } catch (err3) {
-              console.error("[QuickDelete] Error fetching locale:", err3);
-              return "en-US";
-            }
+            console.warn("[QuickDelete] Falling back to default locale (en-US)");
+            return "en-US";
           };
           var getCurrentTranslations = () => {
             try {
               var locale = getLocale();
               var translations = autoConfirmKeys.map((key) => {
-                var translationObject = intl?.t?.[key]?.(locale);
-                if (typeof translationObject === "object" && translationObject?.reserialize) {
-                  var translation = translationObject.reserialize();
-                  console.log(`[QuickDelete] Key "${key}" translation in "${locale}":`, translation);
-                  return translation.toLowerCase().trim();
-                } else {
-                  console.warn(`[QuickDelete] Key "${key}" did not return a valid translation object.`);
-                  return "";
-                }
+                var translation = intl?.t?.[key]?.(locale);
+                console.log(`[QuickDelete] Key "${key}" translation in "${locale}":`, translation);
+                return (translation || "").toLowerCase().trim();
               });
               return translations.filter(Boolean);
             } catch (err3) {

@@ -16873,7 +16873,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         author: "NAME",
         description: "Auto-confirm popups.",
         id: "vengeance.quickdelete",
-        version: "1.0.0",
+        version: "1.0.1",
         icon: "EyeIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup }) {
@@ -16887,13 +16887,33 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             "vXZ+Fh",
             "AMvpS0"
           ];
-          var getLocale = () => {
+          var getRevengeLocale = () => {
             try {
               var settings2 = modules3.findByProps("getLocale", "setLocale");
               if (settings2) {
                 var locale = settings2.getLocale();
-                console.log("[QuickDelete] Locale found:", locale);
+                console.log("[QuickDelete] Revenge app locale:", locale);
                 return locale;
+              } else {
+                console.warn("[QuickDelete] Locale module for Revenge not found, falling back to system locale.");
+                return null;
+              }
+            } catch (err3) {
+              console.error("[QuickDelete] Error fetching Revenge locale:", err3);
+              return null;
+            }
+          };
+          var getLocale = () => {
+            var appLocale = getRevengeLocale();
+            if (appLocale) {
+              return appLocale;
+            }
+            try {
+              var settings2 = modules3.findByProps("getLocale", "setLocale");
+              if (settings2) {
+                var systemLocale = settings2.getLocale();
+                console.log("[QuickDelete] System locale:", systemLocale);
+                return systemLocale;
               } else {
                 console.warn("[QuickDelete] Locale module not found, using default.");
                 return "en-US";
@@ -16927,7 +16947,6 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             var rawArgs = args?.[0] || {};
             var titleInternal = (rawArgs?.children?.props?.title?.toLowerCase().trim() || "").normalize();
             var bodyText = (rawArgs?.body?.toLowerCase().trim() || "").normalize();
-            console.log("[QuickDelete] Popup arguments (raw):", JSON.stringify(rawArgs, null, 2));
             console.log("[QuickDelete] Internal title:", titleInternal);
             console.log("[QuickDelete] Body text:", bodyText);
             var translatedBodies = getCurrentTranslations();

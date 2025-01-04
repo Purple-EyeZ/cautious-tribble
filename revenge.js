@@ -16889,42 +16889,22 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           ];
           var getAppLocale = () => {
             try {
-              var appLocale = intl?.intl?.locale;
+              var appLocale = intl?.intl?.currentLocale;
               if (appLocale) {
                 console.log("[QuickDelete] App locale:", appLocale);
                 return appLocale;
               } else {
-                console.warn("[QuickDelete] App locale not found, falling back to system locale.");
-                return null;
-              }
-            } catch (err3) {
-              console.error("[QuickDelete] Error fetching app locale:", err3);
-              return null;
-            }
-          };
-          var getLocale = () => {
-            var appLocale = getAppLocale();
-            if (appLocale) {
-              return appLocale;
-            }
-            try {
-              var settings2 = modules3.findByProps("getLocale", "setLocale");
-              if (settings2) {
-                var systemLocale = settings2.getLocale();
-                console.log("[QuickDelete] System locale:", systemLocale);
-                return systemLocale;
-              } else {
-                console.warn("[QuickDelete] Locale module not found, using default.");
+                console.warn("[QuickDelete] App locale not found, falling back to default.");
                 return "en-US";
               }
             } catch (err3) {
-              console.error("[QuickDelete] Error fetching locale:", err3);
+              console.error("[QuickDelete] Error fetching app locale:", err3);
               return "en-US";
             }
           };
           var getCurrentTranslations = () => {
             try {
-              var locale = getLocale();
+              var locale = getAppLocale();
               var translations = autoConfirmKeys.map((key) => {
                 var translationObject = intl?.t?.[key]?.();
                 if (translationObject && typeof translationObject === "object" && translationObject.reserialize) {

@@ -10167,17 +10167,17 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               relevantDim.start = itemRect.y;
             }
           };
-          ViewabilityTracker2.prototype._isItemInBounds = function(window2, itemBound) {
-            return window2.start < itemBound && window2.end > itemBound;
+          ViewabilityTracker2.prototype._isItemInBounds = function(window, itemBound) {
+            return window.start < itemBound && window.end > itemBound;
           };
-          ViewabilityTracker2.prototype._isItemBoundsBeyondWindow = function(window2, startBound, endBound) {
-            return window2.start >= startBound && window2.end <= endBound;
+          ViewabilityTracker2.prototype._isItemBoundsBeyondWindow = function(window, startBound, endBound) {
+            return window.start >= startBound && window.end <= endBound;
           };
-          ViewabilityTracker2.prototype._isZeroHeightEdgeElement = function(window2, startBound, endBound) {
-            return startBound - endBound === 0 && (window2.start === startBound || window2.end === endBound);
+          ViewabilityTracker2.prototype._isZeroHeightEdgeElement = function(window, startBound, endBound) {
+            return startBound - endBound === 0 && (window.start === startBound || window.end === endBound);
           };
-          ViewabilityTracker2.prototype._itemIntersectsWindow = function(window2, startBound, endBound) {
-            return this._isItemInBounds(window2, startBound) || this._isItemInBounds(window2, endBound) || this._isItemBoundsBeyondWindow(window2, startBound, endBound) || this._isZeroHeightEdgeElement(window2, startBound, endBound);
+          ViewabilityTracker2.prototype._itemIntersectsWindow = function(window, startBound, endBound) {
+            return this._isItemInBounds(window, startBound) || this._isItemInBounds(window, endBound) || this._isItemBoundsBeyondWindow(window, startBound, endBound) || this._isZeroHeightEdgeElement(window, startBound, endBound);
           };
           ViewabilityTracker2.prototype._itemIntersectsEngagedWindow = function(startBound, endBound) {
             return this._itemIntersectsWindow(this._engagedWindow, startBound, endBound);
@@ -16883,9 +16883,12 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.error("[QuickDelete] Popup module not found");
             return;
           }
-          var allModules = Object.values(window.__revengeInternals.modules);
-          var localeModules = allModules.filter((mod2) => Object.keys(mod2).some((key) => key.toLowerCase().includes("locale") || key.toLowerCase().includes("lang")));
-          console.log("[QuickDelete] Possible locale modules:", localeModules);
+          var localeModule = modules3.findByProps("getLocale", "setLocale", "currentLocale", "appLocale", "Language");
+          if (localeModule) {
+            console.log("[QuickDelete] Locale module found:", localeModule);
+            var appLocale = localeModule.getLocale?.();
+            console.log("[QuickDelete] Locale from app module:", appLocale);
+          }
           var autoConfirmKeys = [
             "vXZ+Fh",
             "AMvpS0"
@@ -16907,9 +16910,9 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             }
           };
           var getLocale = () => {
-            var appLocale = getRevengeLocale();
-            if (appLocale) {
-              return appLocale;
+            var appLocale2 = getRevengeLocale();
+            if (appLocale2) {
+              return appLocale2;
             }
             try {
               var settings2 = modules3.findByProps("getLocale", "setLocale");

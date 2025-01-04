@@ -1978,7 +1978,7 @@
                 ") \u2022 Revenge ",
                 "local",
                 " (",
-                "362626d",
+                "a02e9b2",
                 true ? "-dirty" : "",
                 ")"
               ]
@@ -6756,7 +6756,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               {
                 label: "Revenge",
                 icon: "Revenge.RevengeIcon",
-                trailing: `${"local"} (${"362626d"}${true ? "-dirty" : ""})`
+                trailing: `${"local"} (${"a02e9b2"}${true ? "-dirty" : ""})`
               },
               {
                 label: "Discord",
@@ -16863,17 +16863,22 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/quickdelete/index.ts
+  var autoConfirmKeys;
   var init_quickdelete = __esm({
     "src/plugins/vengeance/quickdelete/index.ts"() {
       "use strict";
       init_internals();
       init_common();
+      autoConfirmKeys = [
+        "vXZ+Fh",
+        "AMvpS0"
+      ];
       registerPlugin({
         name: "Quick Delete",
         author: "NAME",
         description: "Auto-confirm popups.",
         id: "vengeance.quickdelete",
-        version: "1.0.2",
+        version: "1.0.3",
         icon: "EyeIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup }) {
@@ -16883,27 +16888,22 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.error("[QuickDelete] Popup module not found");
             return;
           }
-          var autoConfirmKeys = [
-            "vXZ+Fh",
-            "AMvpS0"
-          ];
-          var translatedBodies = [];
+          var translatedBodies = /* @__PURE__ */ new Set();
           var initializeTranslations = () => {
             try {
               var appLocale = intl?.intl?.currentLocale || "en-US";
               console.log("[QuickDelete] App locale:", appLocale);
-              translatedBodies = autoConfirmKeys.map((key) => {
+              autoConfirmKeys.forEach((key) => {
                 var translationObject = intl?.t?.[key]?.(appLocale);
                 if (translationObject && typeof translationObject === "object" && translationObject.reserialize) {
-                  var translation = translationObject.reserialize().toLowerCase().trim();
-                  console.log(`[QuickDelete] Key "${key}" translation in "${appLocale}":`, translation);
-                  return translation;
+                  var translation = translationObject.reserialize().trim();
+                  console.log(`[QuickDelete] Key "${key}" translation:`, translation);
+                  translatedBodies.add(translation);
                 } else {
                   console.warn(`[QuickDelete] No valid translation found for key: "${key}"`);
-                  return "";
                 }
-              }).filter(Boolean);
-              console.log("[QuickDelete] Finalized translations:", translatedBodies);
+              });
+              console.log("[QuickDelete] Translations initialized:", Array.from(translatedBodies));
             } catch (err3) {
               console.error("[QuickDelete] Error initializing translations:", err3);
             }
@@ -16911,16 +16911,13 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           initializeTranslations();
           cleanup(patcher6.instead(Popup, "show", (args, original) => {
             var rawArgs = args?.[0] || {};
-            var titleInternal = (rawArgs?.children?.props?.title?.toLowerCase().trim() || "").normalize();
-            var bodyText = (rawArgs?.body?.toLowerCase().trim() || "").normalize();
+            var titleInternal = rawArgs?.children?.props?.title?.trim();
+            var bodyText = rawArgs?.body?.trim();
             console.log("[QuickDelete] Internal title:", titleInternal);
             console.log("[QuickDelete] Body text:", bodyText);
-            var matchTitle = translatedBodies.some((translated) => titleInternal.includes(translated));
-            var matchBody = translatedBodies.some((translated) => bodyText.includes(translated));
-            console.log("[QuickDelete] Match title:", matchTitle);
-            console.log("[QuickDelete] Match body:", matchBody);
-            if (matchTitle || matchBody) {
-              console.log(`[QuickDelete] Auto-confirming popup with text: ${titleInternal || bodyText}`);
+            var isAutoConfirm = titleInternal && translatedBodies.has(titleInternal) || bodyText && translatedBodies.has(bodyText);
+            if (isAutoConfirm) {
+              console.log("[QuickDelete] Auto-confirming popup");
               rawArgs.onConfirm?.();
               return;
             }
@@ -17849,7 +17846,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           var PlatformConstants = import_react_native23.Platform.constants;
           var content = [
             "**Vengeance Debug**",
-            `> **Vengeance:** ${"362626d"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
+            `> **Vengeance:** ${"a02e9b2"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
             `> **Discord:** ${ClientInfoModule.Version} (${ClientInfoModule.Build})`,
             `> **React:** ${React.version} (**RN** ${runtimeProps["OSS Release Version"]?.slice(7)})`,
             `> **Hermes:** ${runtimeProps["OSS Release Version"]} (bytecode ${runtimeProps["Bytecode Version"]})`,
@@ -18000,7 +17997,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             keyClr,
             titleClr: baseClr === 0 ? 7 : 0,
             username,
-            title: `${"362626d"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
+            title: `${"a02e9b2"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
             discord: `${ClientInfoModule.Version} (${ClientInfoModule.Build}) ${isOutdated ? "\u26B0" : ""}${ClientInfoModule.ReleaseChannel.includes("canary") ? "\u{1F329}" : ""}`,
             os: `${PlatformConstants.systemName ?? "Android"} ${PlatformConstants.Release ?? PlatformConstants.osVersion}${PlatformConstants.Version ? ` (SDK ${PlatformConstants.Version})` : ""}`,
             device: `${getDeviceInfo2()} (by ${getDeviceManufacturer2()})`,

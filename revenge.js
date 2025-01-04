@@ -16875,56 +16875,35 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       ];
       registerPlugin({
         name: "Quick Delete",
-        author: "NAME",
-        description: "Auto-confirm popups.",
+        author: "Purple_\u039Eye\u2122",
+        description: "Remove confirmation when deleting a message or an embed.",
         id: "vengeance.quickdelete",
-        version: "1.0.3",
-        icon: "EyeIcon"
+        version: "1.0.5",
+        icon: "ic_message_delete"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup }) {
-          console.log("[QuickDelete] Plugin loaded");
           var Popup = modules3.findByProps("show", "openLazy");
-          if (!Popup) {
-            console.error("[QuickDelete] Popup module not found");
+          if (!Popup) return console.error("[QuickDelete] Popup module not found");
+          var locale = intl?.intl?.currentLocale;
+          if (!locale) {
+            console.error("[QuickDelete] Locale not found. Plugin initialization aborted.");
             return;
           }
-          var translatedBodies = /* @__PURE__ */ new Set();
-          var initializeTranslations = () => {
-            try {
-              var appLocale = intl?.intl?.currentLocale || "en-US";
-              console.log("[QuickDelete] App locale:", appLocale);
-              autoConfirmKeys.forEach((key) => {
-                var translationObject = intl?.t?.[key]?.(appLocale);
-                if (translationObject && typeof translationObject === "object" && translationObject.reserialize) {
-                  var translation = translationObject.reserialize().trim();
-                  console.log(`[QuickDelete] Key "${key}" translation:`, translation);
-                  translatedBodies.add(translation);
-                } else {
-                  console.warn(`[QuickDelete] No valid translation found for key: "${key}"`);
-                }
-              });
-              console.log("[QuickDelete] Translations initialized:", Array.from(translatedBodies));
-            } catch (err3) {
-              console.error("[QuickDelete] Error initializing translations:", err3);
-            }
-          };
-          initializeTranslations();
-          cleanup(patcher6.instead(Popup, "show", (args, original) => {
-            var rawArgs = args?.[0] || {};
-            var titleInternal = rawArgs?.children?.props?.title?.trim();
-            var bodyText = rawArgs?.body?.trim();
-            console.log("[QuickDelete] Internal title:", titleInternal);
-            console.log("[QuickDelete] Body text:", bodyText);
-            var isAutoConfirm = titleInternal && translatedBodies.has(titleInternal) || bodyText && translatedBodies.has(bodyText);
-            if (isAutoConfirm) {
-              console.log("[QuickDelete] Auto-confirming popup");
-              rawArgs.onConfirm?.();
+          var translations = /* @__PURE__ */ new Set();
+          autoConfirmKeys.forEach((key) => {
+            var translated = intl?.t?.[key]?.(locale)?.reserialize?.()?.trim();
+            if (translated) translations.add(translated);
+          });
+          cleanup(patcher6.instead(Popup, "show", ([popup], original) => {
+            var title = popup?.children?.props?.title?.trim();
+            var body = popup?.body?.trim();
+            if (translations.has(title) || translations.has(body)) {
+              popup.onConfirm?.();
               return;
             }
-            console.log("[QuickDelete] Popup not auto-confirmed.");
-            original.apply(this, args);
-          }, "Popup.show"));
-          console.log("[QuickDelete] Patcher applied");
+            original.apply(this, arguments);
+          }));
+          console.log("[QuickDelete] Plugin initialized with translations:", Array.from(translations));
         }
       }, {
         external: false,

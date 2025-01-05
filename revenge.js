@@ -1978,7 +1978,7 @@
                 ") \u2022 Revenge ",
                 "local",
                 " (",
-                "a02e9b2",
+                "2b8a548",
                 true ? "-dirty" : "",
                 ")"
               ]
@@ -6756,7 +6756,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               {
                 label: "Revenge",
                 icon: "Revenge.RevengeIcon",
-                trailing: `${"local"} (${"a02e9b2"}${true ? "-dirty" : ""})`
+                trailing: `${"local"} (${"2b8a548"}${true ? "-dirty" : ""})`
               },
               {
                 label: "Discord",
@@ -16862,26 +16862,31 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     }
   });
 
-  // src/plugins/vengeance/quickdelete/index.ts
-  var autoConfirmKeys;
+  // src/plugins/vengeance/quickdelete/index.tsx
+  var import_react_native20, autoConfirmKeys;
   var init_quickdelete = __esm({
-    "src/plugins/vengeance/quickdelete/index.ts"() {
+    "src/plugins/vengeance/quickdelete/index.tsx"() {
       "use strict";
+      init_react_jsx_runtime();
       init_internals();
       init_common();
-      autoConfirmKeys = [
-        "vXZ+Fh",
-        "AMvpS0"
-      ];
+      init_components();
+      import_react_native20 = __toESM(require_react_native(), 1);
+      init_src6();
+      init_Wrapper();
+      autoConfirmKeys = {
+        message: "vXZ+Fh",
+        embed: "AMvpS0"
+      };
       registerPlugin({
         name: "Quick Delete",
         author: "Purple_\u039Eye\u2122",
         description: "Remove confirmation when deleting a message or an embed.",
         id: "vengeance.quickdelete",
-        version: "1.0.5",
+        version: "1.1.0",
         icon: "ic_message_delete"
       }, {
-        afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup }) {
+        afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
           var Popup = modules3.findByProps("show", "openLazy");
           if (!Popup) return console.error("[QuickDelete] Popup module not found");
           var locale = intl?.intl?.currentLocale;
@@ -16889,21 +16894,69 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.error("[QuickDelete] Locale not found. Plugin initialization aborted.");
             return;
           }
-          var translations = /* @__PURE__ */ new Set();
-          autoConfirmKeys.forEach((key) => {
-            var translated = intl?.t?.[key]?.(locale)?.reserialize?.()?.trim();
-            if (translated) translations.add(translated);
+          var translations = {
+            message: null,
+            embed: null
+          };
+          Object.keys(autoConfirmKeys).forEach((type) => {
+            var translated = intl?.t?.[autoConfirmKeys[type]]?.(locale)?.reserialize?.()?.trim();
+            if (translated) translations[type] = translated;
           });
           cleanup(patcher6.instead(Popup, "show", ([popup], original) => {
             var title = popup?.children?.props?.title?.trim();
             var body = popup?.body?.trim();
-            if (translations.has(title) || translations.has(body)) {
+            if (storage.autoConfirmMessage && translations.message && (title === translations.message || body === translations.message) || storage.autoConfirmEmbed && translations.embed && (title === translations.embed || body === translations.embed)) {
               popup.onConfirm?.();
               return;
             }
             original.apply(this, arguments);
           }));
-          console.log("[QuickDelete] Plugin initialized with translations:", Array.from(translations));
+        },
+        initializeStorage() {
+          return {
+            autoConfirmMessage: true,
+            autoConfirmEmbed: true
+          };
+        },
+        SettingsComponent({ storage }) {
+          useObservable([
+            storage
+          ]);
+          return /* @__PURE__ */ jsx(import_react_native20.ScrollView, {
+            children: /* @__PURE__ */ jsxs(PageWrapper, {
+              children: [
+                /* @__PURE__ */ jsx(Card, {
+                  children: /* @__PURE__ */ jsx(Text, {
+                    variant: "text-md/medium",
+                    children: "Quick Delete allows you to automatically confirm message or embed deletions."
+                  })
+                }),
+                /* @__PURE__ */ jsxs(TableRowGroup, {
+                  title: "Settings",
+                  children: [
+                    /* @__PURE__ */ jsx(TableSwitchRow, {
+                      label: "Auto-confirm message deletion",
+                      subLabel: "Automatically confirms deletion popups for messages",
+                      icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                        source: "ic_message_delete"
+                      }),
+                      value: storage.autoConfirmMessage,
+                      onValueChange: (v2) => storage.autoConfirmMessage = v2
+                    }),
+                    /* @__PURE__ */ jsx(TableSwitchRow, {
+                      label: "Auto-confirm embed deletion",
+                      subLabel: "Automatically confirms deletion popups for embeds",
+                      icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                        source: "ic_embed_delete"
+                      }),
+                      value: storage.autoConfirmEmbed,
+                      onValueChange: (v2) => storage.autoConfirmEmbed = v2
+                    })
+                  ]
+                })
+              ]
+            })
+          });
         }
       }, {
         external: false,
@@ -17323,7 +17376,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       }
       return row;
     }, "realify.RowGenerator");
-    patcher6.before(import_react_native20.View, "render", (args) => {
+    patcher6.before(import_react_native21.View, "render", (args) => {
       var props = args?.[0];
       var textMain = props?.children?.[0]?.props;
       var textSub = props?.children?.[1]?.props;
@@ -17342,11 +17395,11 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       }
     }, "realify.StickerDetailActionSheet");
   }
-  var import_react_native20, cdnLinks, emojiUrlRegex, stickerUrlRegex, attachmentUrlRegex, isFakerAlt, shouldDebug;
+  var import_react_native21, cdnLinks, emojiUrlRegex, stickerUrlRegex, attachmentUrlRegex, isFakerAlt, shouldDebug;
   var init_realify = __esm({
     "src/plugins/vengeance/freenitro/patches/realify.tsx"() {
       "use strict";
-      import_react_native20 = __toESM(require_react_native(), 1);
+      import_react_native21 = __toESM(require_react_native(), 1);
       init_debugger();
       cdnLinks = [
         "cdn.discordapp.com",
@@ -17361,7 +17414,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/freenitro/index.tsx
-  var import_react_native21, emojiSizeLadder, stickerSizeLadder, useSettingsStyles, plugin3;
+  var import_react_native22, emojiSizeLadder, stickerSizeLadder, useSettingsStyles, plugin3;
   var init_freenitro = __esm({
     "src/plugins/vengeance/freenitro/index.tsx"() {
       "use strict";
@@ -17372,7 +17425,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_internals();
       init_src6();
       init_colors();
-      import_react_native21 = __toESM(require_react_native(), 1);
+      import_react_native22 = __toESM(require_react_native(), 1);
       init_Wrapper();
       init_appIcons();
       init_nitroThemes();
@@ -17481,7 +17534,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             storage
           ]);
           var settingsStyles = useSettingsStyles();
-          return /* @__PURE__ */ jsx(import_react_native21.ScrollView, {
+          return /* @__PURE__ */ jsx(import_react_native22.ScrollView, {
             children: /* @__PURE__ */ jsxs(PageWrapper, {
               children: [
                 /* @__PURE__ */ jsxs(TableRowGroup, {
@@ -17538,7 +17591,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                         children: storage.emoji.size
                       })
                     }),
-                    /* @__PURE__ */ jsx(import_react_native21.View, {
+                    /* @__PURE__ */ jsx(import_react_native22.View, {
                       style: settingsStyles.slider,
                       children: /* @__PURE__ */ jsx(Slider, {
                         value: emojiSizeLadder.indexOf(storage.emoji.size) + 1,
@@ -17582,7 +17635,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                         children: storage.stickers.size
                       })
                     }),
-                    /* @__PURE__ */ jsx(import_react_native21.View, {
+                    /* @__PURE__ */ jsx(import_react_native22.View, {
                       style: settingsStyles.slider,
                       children: /* @__PURE__ */ jsx(Slider, {
                         value: stickerSizeLadder.indexOf(storage.stickers.size) + 1,
@@ -17632,7 +17685,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                     })
                   ]
                 }),
-                /* @__PURE__ */ jsx(import_react_native21.View, {
+                /* @__PURE__ */ jsx(import_react_native22.View, {
                   style: {
                     height: 12
                   }
@@ -17664,7 +17717,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           direction: "horizontal",
           spacing: 8,
           children: [
-            /* @__PURE__ */ jsx(import_react_native22.Image, {
+            /* @__PURE__ */ jsx(import_react_native23.Image, {
               source: (pluh.icon && getAssetIndexByName(pluh.icon)) ?? getAssetIndexByName("UnknownGameIcon"),
               style: styles7.icon
             }),
@@ -17705,7 +17758,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       })
     });
   }
-  var import_react_native22, useAlertStyles;
+  var import_react_native23, useAlertStyles;
   var init_newplugins = __esm({
     "src/plugins/vengeance/newplugins/index.tsx"() {
       "use strict";
@@ -17715,7 +17768,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_components();
       init_internals();
       init_colors();
-      import_react_native22 = __toESM(require_react_native(), 1);
+      import_react_native23 = __toESM(require_react_native(), 1);
       registerPlugin({
         name: "Plugin Notifier",
         author: "Vengeance",
@@ -17793,7 +17846,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/commands/cmds/debug.ts
-  var import_react_native23, MinimumSupportedBuildNumber2, getDeviceInfo, getDeviceManufacturer, debug_default;
+  var import_react_native24, MinimumSupportedBuildNumber2, getDeviceInfo, getDeviceManufacturer, debug_default;
   var init_debug = __esm({
     "src/plugins/vengeance/commands/cmds/debug.ts"() {
       "use strict";
@@ -17802,7 +17855,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_native();
       init_lazy();
       init_commands();
-      import_react_native23 = __toESM(require_react_native(), 1);
+      import_react_native24 = __toESM(require_react_native(), 1);
       MinimumSupportedBuildNumber2 = ReactNative.Platform.select({
         default: 254e3,
         ios: 66559
@@ -17822,10 +17875,10 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         execute([ephemeral], ctx) {
           var isOutdated = !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber2);
           var runtimeProps = HermesInternal.getRuntimeProperties();
-          var PlatformConstants = import_react_native23.Platform.constants;
+          var PlatformConstants = import_react_native24.Platform.constants;
           var content = [
             "**Vengeance Debug**",
-            `> **Vengeance:** ${"a02e9b2"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
+            `> **Vengeance:** ${"2b8a548"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
             `> **Discord:** ${ClientInfoModule.Version} (${ClientInfoModule.Build})`,
             `> **React:** ${React.version} (**RN** ${runtimeProps["OSS Release Version"]?.slice(7)})`,
             `> **Hermes:** ${runtimeProps["OSS Release Version"]} (bytecode ${runtimeProps["Bytecode Version"]})`,
@@ -17886,7 +17939,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/commands/cmds/venfetch.ts
-  var import_react_native24, MinimumSupportedBuildNumber3, getDeviceInfo2, getDeviceManufacturer2, getCurrentUser, message, prime, colorRange, venfetch_default;
+  var import_react_native25, MinimumSupportedBuildNumber3, getDeviceInfo2, getDeviceManufacturer2, getCurrentUser, message, prime, colorRange, venfetch_default;
   var init_venfetch = __esm({
     "src/plugins/vengeance/commands/cmds/venfetch.ts"() {
       "use strict";
@@ -17896,7 +17949,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_lazy();
       init_commands();
       init_internals();
-      import_react_native24 = __toESM(require_react_native(), 1);
+      import_react_native25 = __toESM(require_react_native(), 1);
       MinimumSupportedBuildNumber3 = ReactNative.Platform.select({
         default: 254e3,
         ios: 66559
@@ -17941,7 +17994,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         execute(args, ctx) {
           var ephemeral = args.find((a) => a.name === "ephemeral");
           var color = args.find((a) => a.name === "color");
-          var PlatformConstants = import_react_native24.Platform.constants;
+          var PlatformConstants = import_react_native25.Platform.constants;
           var isOutdated = !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber3);
           var allPlugins = Object.values(registeredPlugins);
           var externalPlugins = allPlugins.filter((plugin4) => plugin4.external && plugin4.enabled);
@@ -17976,7 +18029,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             keyClr,
             titleClr: baseClr === 0 ? 7 : 0,
             username,
-            title: `${"a02e9b2"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
+            title: `${"2b8a548"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
             discord: `${ClientInfoModule.Version} (${ClientInfoModule.Build}) ${isOutdated ? "\u26B0" : ""}${ClientInfoModule.ReleaseChannel.includes("canary") ? "\u{1F329}" : ""}`,
             os: `${PlatformConstants.systemName ?? "Android"} ${PlatformConstants.Release ?? PlatformConstants.osVersion}${PlatformConstants.Version ? ` (SDK ${PlatformConstants.Version})` : ""}`,
             device: `${getDeviceInfo2()} (by ${getDeviceManufacturer2()})`,

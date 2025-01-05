@@ -16883,7 +16883,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         author: "Purple_\u039Eye\u2122",
         description: "Remove confirmation when deleting a message or an embed.",
         id: "vengeance.quickdelete",
-        version: "1.1.0",
+        version: "1.1.1",
         icon: "ic_message_delete"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
@@ -16905,7 +16905,9 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           cleanup(patcher6.instead(Popup, "show", ([popup], original) => {
             var title = popup?.children?.props?.title?.trim();
             var body = popup?.body?.trim();
-            if (storage.autoConfirmMessage && translations.message && (title === translations.message || body === translations.message) || storage.autoConfirmEmbed && translations.embed && (title === translations.embed || body === translations.embed)) {
+            var isMessageDeletion = translations.message && (title === translations.message || body === translations.message);
+            var isEmbedDeletion = translations.embed && (title === translations.embed || body === translations.embed);
+            if (storage.autoConfirmMessage && isMessageDeletion || storage.autoConfirmEmbed && isEmbedDeletion) {
               popup.onConfirm?.();
               return;
             }

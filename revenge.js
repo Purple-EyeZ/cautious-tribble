@@ -16882,48 +16882,34 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       registerPlugin({
         name: "Quick Delete",
         author: "Purple_\u039Eye\u2122",
-        description: "Remove confirmation when deleting a message or an embed.",
+        description: "Automatically confirm message or embed deletion.",
         id: "vengeance.quickdelete",
-        version: "1.2.2",
+        version: "1.3.0",
         icon: "TrashIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
           var Popup = modules3.findByProps("show", "openLazy");
           if (!Popup) return console.error("[QuickDelete] Popup module not found");
           var locale = intl?.intl?.currentLocale;
-          if (!locale) {
-            console.error("[QuickDelete] Locale not found. Plugin initialization aborted.");
-            return;
-          }
-          var translations = {
-            message: null,
-            embed: null
-          };
-          Object.keys(autoConfirmKeys).forEach((type) => {
-            var translated = intl?.t?.[autoConfirmKeys[type]]?.(locale)?.reserialize?.()?.trim();
-            translations[type] = translated;
-            console.log(`[QuickDelete] Translation for ${type}:`, translated);
-          });
+          if (!locale) return console.error("[QuickDelete] Locale not found.");
+          var translations = Object.fromEntries(Object.entries(autoConfirmKeys).map(([key, id]) => [
+            key,
+            intl?.t?.[id]?.(locale)?.trim()
+          ]));
           cleanup(patcher6.instead(Popup, "show", ([popup], original) => {
-            var title = popup?.children?.props?.title?.trim();
-            var body = popup?.body?.trim();
-            console.log("[QuickDelete] Popup detected:");
-            console.log("- Title:", title);
-            console.log("- Body:", body);
-            var isMessageDeletion = title === translations.message || body === translations.message;
-            var isEmbedDeletion = title === translations.embed || body === translations.embed;
-            console.log("[QuickDelete] Match detected:");
-            console.log("- Is Message Deletion:", isMessageDeletion);
-            console.log("- Is Embed Deletion:", isEmbedDeletion);
-            if (storage.autoConfirmMessage && isMessageDeletion || storage.autoConfirmEmbed && isEmbedDeletion) {
-              console.log("[QuickDelete] Auto-confirm triggered");
+            var { title, body } = popup?.children?.props ?? {};
+            var isDeletion = (type) => translations[type] && [
+              title?.trim(),
+              body?.trim()
+            ].includes(translations[type]);
+            if (storage.autoConfirmMessage && isDeletion("message") || storage.autoConfirmEmbed && isDeletion("embed")) {
               popup.onConfirm?.();
-              return;
+            } else {
+              original.call(Popup, popup);
             }
-            console.log("[QuickDelete] Showing native popup");
-            return original.call(Popup, popup);
           }));
         },
+        // TODO: Check that settings are enabled by default when the plugin is installed.
         initializeStorage() {
           return {
             autoConfirmMessage: true,
@@ -16934,6 +16920,22 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           useObservable([
             storage
           ]);
+          var settings2 = [
+            {
+              label: "Auto-confirm message deletion",
+              subLabel: "Automatically confirms deletion popups for messages",
+              icon: "ForumIcon",
+              value: storage.autoConfirmMessage,
+              onChange: (v2) => storage.autoConfirmMessage = v2
+            },
+            {
+              label: "Auto-confirm embed deletion",
+              subLabel: "Automatically confirms deletion popups for embeds",
+              icon: "EmbedIcon",
+              value: storage.autoConfirmEmbed,
+              onChange: (v2) => storage.autoConfirmEmbed = v2
+            }
+          ];
           return /* @__PURE__ */ jsx(import_react_native20.ScrollView, {
             children: /* @__PURE__ */ jsxs(PageWrapper, {
               children: [
@@ -16943,37 +16945,22 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                     children: "Quick Delete allows you to automatically confirm message or embed deletions."
                   })
                 }),
-                /* @__PURE__ */ jsxs(TableRowGroup, {
+                /* @__PURE__ */ jsx(TableRowGroup, {
                   title: "Settings",
-                  children: [
-                    /* @__PURE__ */ jsx(TableSwitchRow, {
-                      label: "Auto-confirm message deletion",
-                      subLabel: "Automatically confirms deletion popups for messages",
-                      icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                        source: getAssetIndexByName("ForumIcon")
-                      }),
-                      value: storage.autoConfirmMessage,
-                      onValueChange: (v2) => storage.autoConfirmMessage = v2
+                  children: settings2.map(({ label, subLabel, icon, value, onChange }) => /* @__PURE__ */ jsx(TableSwitchRow, {
+                    label,
+                    subLabel,
+                    icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                      source: getAssetIndexByName(icon)
                     }),
-                    /* @__PURE__ */ jsx(TableSwitchRow, {
-                      label: "Auto-confirm embed deletion",
-                      subLabel: "Automatically confirms deletion popups for embeds",
-                      icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                        source: getAssetIndexByName("EmbedIcon")
-                      }),
-                      value: storage.autoConfirmEmbed,
-                      onValueChange: (v2) => storage.autoConfirmEmbed = v2
-                    })
-                  ]
+                    value,
+                    onValueChange: onChange
+                  }, label))
                 })
               ]
             })
           });
         }
-      }, {
-        external: false,
-        manageable: true,
-        enabled: true
       });
     }
   });

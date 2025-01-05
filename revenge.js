@@ -16870,6 +16870,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_react_jsx_runtime();
       init_internals();
       init_common();
+      init_src5();
       init_components();
       import_react_native20 = __toESM(require_react_native(), 1);
       init_src6();
@@ -16884,7 +16885,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         description: "Remove confirmation when deleting a message or an embed.",
         id: "vengeance.quickdelete",
         version: "1.1.1",
-        icon: "ic_message_delete"
+        icon: "TrashIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
           var Popup = modules3.findByProps("show", "openLazy");
@@ -16940,7 +16941,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                       label: "Auto-confirm message deletion",
                       subLabel: "Automatically confirms deletion popups for messages",
                       icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                        source: "ic_message_delete"
+                        source: getAssetIndexByName("ForumIcon")
                       }),
                       value: storage.autoConfirmMessage,
                       onValueChange: (v2) => storage.autoConfirmMessage = v2
@@ -16949,7 +16950,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                       label: "Auto-confirm embed deletion",
                       subLabel: "Automatically confirms deletion popups for embeds",
                       icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                        source: "ic_embed_delete"
+                        source: getAssetIndexByName("EmbedIcon")
                       }),
                       value: storage.autoConfirmEmbed,
                       onValueChange: (v2) => storage.autoConfirmEmbed = v2

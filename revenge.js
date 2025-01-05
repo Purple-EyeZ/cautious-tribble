@@ -16884,32 +16884,35 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         author: "Purple_\u039Eye\u2122",
         description: "Automatically confirm message or embed deletion.",
         id: "vengeance.quickdelete",
-        version: "1.3.0",
+        version: "1.3.1",
         icon: "TrashIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
           var Popup = modules3.findByProps("show", "openLazy");
-          if (!Popup) return console.error("[QuickDelete] Popup module not found");
+          if (!Popup) return console.error("[QuickDelete] Popup module not found.");
           var locale = intl?.intl?.currentLocale;
-          if (!locale) return console.error("[QuickDelete] Locale not found.");
+          if (!locale) {
+            console.error("[QuickDelete] Locale not found.");
+            return;
+          }
           var translations = Object.fromEntries(Object.entries(autoConfirmKeys).map(([key, id]) => [
             key,
-            intl?.t?.[id]?.(locale)?.trim()
+            intl?.t?.[id]?.(locale)?.trim() || null
           ]));
           cleanup(patcher6.instead(Popup, "show", ([popup], original) => {
-            var { title, body } = popup?.children?.props ?? {};
-            var isDeletion = (type) => translations[type] && [
-              title?.trim(),
-              body?.trim()
-            ].includes(translations[type]);
+            if (!popup || !popup.children?.props) {
+              return original.call(Popup, popup);
+            }
+            var title = popup.children.props.title?.trim() || "";
+            var body = popup.children.props.body?.trim() || "";
+            var isDeletion = (type) => translations[type] && (title === translations[type] || body === translations[type]);
             if (storage.autoConfirmMessage && isDeletion("message") || storage.autoConfirmEmbed && isDeletion("embed")) {
               popup.onConfirm?.();
             } else {
-              original.call(Popup, popup);
+              return original.call(Popup, popup);
             }
           }));
         },
-        // TODO: Check that settings are enabled by default when the plugin is installed.
         initializeStorage() {
           return {
             autoConfirmMessage: true,

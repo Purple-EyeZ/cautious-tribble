@@ -16895,25 +16895,21 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.error("[QuickDelete] Locale not found. Plugin initialization aborted.");
             return;
           }
-          var translations = {
-            message: null,
-            embed: null
-          };
-          Object.keys(autoConfirmKeys).forEach((type) => {
-            var translated = intl?.t?.[autoConfirmKeys[type]]?.(locale)?.reserialize?.()?.trim();
-            translations[type] = translated;
-            console.log(`[QuickDelete] Translation for ${type}:`, translated);
-          });
+          var translations = Object.fromEntries(Object.entries(autoConfirmKeys).map(([type, key]) => [
+            type,
+            intl?.t?.[key]?.(locale)?.reserialize?.()?.trim()
+          ]));
           cleanup(patcher6.instead(Popup, "show", ([popup], original) => {
-            var title = popup?.children?.props?.title?.trim();
-            var body = popup?.body?.trim();
-            var isMessageDeletion = title === translations.message || body === translations.message;
-            var isEmbedDeletion = title === translations.embed || body === translations.embed;
-            if (storage.autoConfirmMessage && isMessageDeletion || storage.autoConfirmEmbed && isEmbedDeletion) {
+            var titleOrBody = [
+              popup?.children?.props?.title?.trim(),
+              popup?.body?.trim()
+            ];
+            var isDeletion = (type) => storage[`autoConfirm${type.charAt(0).toUpperCase() + type.slice(1)}`] && titleOrBody.includes(translations[type]);
+            if (isDeletion("message") || isDeletion("embed")) {
               popup.onConfirm?.();
-              return;
+            } else {
+              return original.call(Popup, popup);
             }
-            return original.call(Popup, popup);
           }));
         },
         initializeStorage() {
@@ -16931,15 +16927,13 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
               label: "Auto-confirm message deletion",
               subLabel: "Automatically confirms deletion popups for messages",
               icon: "ForumIcon",
-              value: storage.autoConfirmMessage,
-              onChange: (v2) => storage.autoConfirmMessage = v2
+              value: "autoConfirmMessage"
             },
             {
               label: "Auto-confirm embed deletion",
               subLabel: "Automatically confirms deletion popups for embeds",
               icon: "EmbedIcon",
-              value: storage.autoConfirmEmbed,
-              onChange: (v2) => storage.autoConfirmEmbed = v2
+              value: "autoConfirmEmbed"
             }
           ];
           return /* @__PURE__ */ jsx(import_react_native20.ScrollView, {
@@ -16953,15 +16947,15 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                 }),
                 /* @__PURE__ */ jsx(TableRowGroup, {
                   title: "Settings",
-                  children: settings2.map(({ label, subLabel, icon, value, onChange }) => /* @__PURE__ */ jsx(TableSwitchRow, {
+                  children: settings2.map(({ label, subLabel, icon, value }) => /* @__PURE__ */ jsx(TableSwitchRow, {
                     label,
                     subLabel,
                     icon: /* @__PURE__ */ jsx(TableRowIcon, {
                       source: getAssetIndexByName(icon)
                     }),
-                    value,
-                    onValueChange: onChange
-                  }, label))
+                    value: storage[value],
+                    onValueChange: (v2) => storage[value] = v2
+                  }, value))
                 })
               ]
             })

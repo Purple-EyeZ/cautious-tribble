@@ -16876,15 +16876,15 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_src6();
       init_Wrapper();
       autoConfirmKeys = {
-        message: "vXZ+Fh",
-        embed: "AMvpS0"
+        embed: "vXZ+Fh",
+        message: "AMvpS0"
       };
       registerPlugin({
         name: "Quick Delete",
         author: "Purple_\u039Eye\u2122",
         description: "Remove confirmation when deleting a message or an embed.",
         id: "vengeance.quickdelete",
-        version: "1.2.1",
+        version: "1.2.2",
         icon: "TrashIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
@@ -16915,14 +16915,13 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.log("[QuickDelete] Match detected:");
             console.log("- Is Message Deletion:", isMessageDeletion);
             console.log("- Is Embed Deletion:", isEmbedDeletion);
-            var autoConfirm = storage.autoConfirmMessage && isMessageDeletion || storage.autoConfirmEmbed && isEmbedDeletion;
-            if (autoConfirm) {
+            if (storage.autoConfirmMessage && isMessageDeletion || storage.autoConfirmEmbed && isEmbedDeletion) {
               console.log("[QuickDelete] Auto-confirm triggered");
               popup.onConfirm?.();
               return;
             }
             console.log("[QuickDelete] Showing native popup");
-            return original.apply(this, arguments);
+            return original.call(Popup, popup);
           }));
         },
         initializeStorage() {

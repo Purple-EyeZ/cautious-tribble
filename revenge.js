@@ -16918,22 +16918,6 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           useObservable([
             storage
           ]);
-          var settings2 = [
-            {
-              label: "Auto-confirm message deletion",
-              subLabel: "Automatically confirms deletion popups for messages",
-              icon: "ForumIcon",
-              value: storage.autoConfirmMessage,
-              onChange: (v2) => storage.autoConfirmMessage = v2
-            },
-            {
-              label: "Auto-confirm embed deletion",
-              subLabel: "Automatically confirms deletion popups for embeds",
-              icon: "EmbedIcon",
-              value: storage.autoConfirmEmbed,
-              onChange: (v2) => storage.autoConfirmEmbed = v2
-            }
-          ];
           return /* @__PURE__ */ jsx(import_react_native20.ScrollView, {
             children: /* @__PURE__ */ jsxs(PageWrapper, {
               children: [
@@ -16943,17 +16927,28 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                     children: "Quick Delete allows you to automatically confirm message or embed deletions."
                   })
                 }),
-                /* @__PURE__ */ jsx(TableRowGroup, {
+                /* @__PURE__ */ jsxs(TableRowGroup, {
                   title: "Settings",
-                  children: settings2.map(({ label, subLabel, icon, value, onChange }) => /* @__PURE__ */ jsx(TableSwitchRow, {
-                    label,
-                    subLabel,
-                    icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                      source: getAssetIndexByName(icon)
+                  children: [
+                    /* @__PURE__ */ jsx(TableSwitchRow, {
+                      label: "Auto-confirm message deletion",
+                      subLabel: "Automatically confirms deletion popups for messages",
+                      icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                        source: getAssetIndexByName("ForumIcon")
+                      }),
+                      value: storage.autoConfirmMessage,
+                      onValueChange: (v2) => storage.autoConfirmMessage = v2
                     }),
-                    value,
-                    onValueChange: onChange
-                  }, label))
+                    /* @__PURE__ */ jsx(TableSwitchRow, {
+                      label: "Auto-confirm embed deletion",
+                      subLabel: "Automatically confirms deletion popups for embeds",
+                      icon: /* @__PURE__ */ jsx(TableRowIcon, {
+                        source: getAssetIndexByName("EmbedIcon")
+                      }),
+                      value: storage.autoConfirmEmbed,
+                      onValueChange: (v2) => storage.autoConfirmEmbed = v2
+                    })
+                  ]
                 })
               ]
             })

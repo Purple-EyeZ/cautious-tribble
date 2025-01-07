@@ -17139,12 +17139,12 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.0",
         icon: "TranslateIcon"
       }, {
-        afterAppRender({ patcher: patcher7, cleanup }) {
+        afterAppRender({ cleanup }) {
           settings2.sourceLang = settings2.sourceLang || "auto";
           settings2.targetLang = settings2.targetLang || "EN";
           settings2.translator = settings2.translator || 0;
           var patches = [
-            ActionSheet_default(settings2)
+            ActionSheet_default()
           ];
           cleanup(() => patches.forEach((unpatch2) => unpatch2()));
         },

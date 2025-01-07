@@ -1109,9 +1109,9 @@
   });
 
   // libraries/modules/src/metro/patches.ts
-  function initializeModulePatches(patcher7, logger5, metroModules) {
+  function initializeModulePatches(patcher6, logger5, metroModules) {
     subscribePatchableModule("f", (exports) => exports.fileFinishedImporting, (exports) => {
-      patcher7.before(exports, "fileFinishedImporting", ([filePath]) => {
+      patcher6.before(exports, "fileFinishedImporting", ([filePath]) => {
         var importingModuleId2 = getImportingModuleId();
         if (importingModuleId2 === -1 || !filePath) return;
         metroModules[importingModuleId2][MetroModuleFilePathKey] = filePath;
@@ -1123,7 +1123,7 @@
       "register",
       "get"
     ].every((x2) => exports[x2]), (exports) => {
-      patcher7.instead(exports, "register", (args, origFunc) => {
+      patcher6.instead(exports, "register", (args, origFunc) => {
         try {
           return origFunc(...args);
         } catch (e) {
@@ -1140,7 +1140,7 @@
     });
     subscribePatchableModule("s", (m2) => m2.initSentry, (m2) => m2.initSentry = noop);
     subscribePatchableModule("d", (m2) => m2.default?.track && m2.default.trackMaker, (m2) => m2.default.track = () => noopPromise);
-    subscribePatchableModule("m", (m2) => m2.isMoment, (moment) => patcher7.instead(moment, "defineLocale", (args, orig) => {
+    subscribePatchableModule("m", (m2) => m2.isMoment, (moment) => patcher6.instead(moment, "defineLocale", (args, orig) => {
       var origLocale = moment.locale();
       orig(...args);
       moment.locale(origLocale);
@@ -10659,7 +10659,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
         value: true
       });
       exports.ComponentCompat = void 0;
-      var React4 = require_react();
+      var React3 = require_react();
       var ComponentCompat = (
         /** @class */
         function(_super) {
@@ -10695,7 +10695,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
             return this.renderCompat();
           };
           return ComponentCompat2;
-        }(React4.Component)
+        }(React3.Component)
       );
       exports.ComponentCompat = ComponentCompat;
     }
@@ -10728,7 +10728,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       Object.defineProperty(exports, "__esModule", {
         value: true
       });
-      var React4 = require_react();
+      var React3 = require_react();
       var BaseScrollComponent = (
         /** @class */
         function(_super) {
@@ -10743,7 +10743,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
             return null;
           };
           return BaseScrollComponent2;
-        }(React4.Component)
+        }(React3.Component)
       );
       exports.default = BaseScrollComponent;
     }
@@ -10786,7 +10786,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       Object.defineProperty(exports, "__esModule", {
         value: true
       });
-      var React4 = require_react();
+      var React3 = require_react();
       var react_native_1 = require_react_native();
       var BaseScrollComponent_1 = require_BaseScrollComponent();
       var TSCast_1 = require_TSCast();
@@ -10857,7 +10857,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               renderAheadOffset: this.props.renderAheadOffset,
               windowSize: (this.props.isHorizontal ? this._width : this._height) + this.props.renderAheadOffset
             };
-            return React4.createElement(Scroller, __assign2({
+            return React3.createElement(Scroller, __assign2({
               ref: this._getScrollViewRef,
               removeClippedSubviews: false,
               scrollEventThrottle: this.props.scrollThrottle
@@ -10865,14 +10865,14 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               horizontal: this.props.isHorizontal,
               onScroll: this._onScroll,
               onLayout: !this._isSizeChangedCalledOnce || this.props.canChangeSize ? this._onLayout : this.props.onLayout
-            }), React4.createElement(react_native_1.View, {
+            }), React3.createElement(react_native_1.View, {
               style: {
                 flexDirection: this.props.isHorizontal ? "row" : "column"
               }
             }, renderContentContainer(contentContainerProps, this.props.children), this.props.renderFooter ? this.props.renderFooter() : null));
           };
           ScrollComponent2.prototype._defaultContainer = function(props, children) {
-            return React4.createElement(react_native_1.View, __assign2({}, props), children);
+            return React3.createElement(react_native_1.View, __assign2({}, props), children);
           };
           ScrollComponent2.defaultProps = {
             contentHeight: 0,
@@ -10999,7 +10999,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       Object.defineProperty(exports, "__esModule", {
         value: true
       });
-      var React4 = require_react();
+      var React3 = require_react();
       var react_native_1 = require_react_native();
       var BaseViewRenderer_1 = require_BaseViewRenderer();
       var ViewRenderer = (
@@ -11089,7 +11089,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
             return this._viewRef;
           };
           ViewRenderer2.prototype._renderItemContainer = function(props, parentProps, children) {
-            return this.props.renderItemContainer && this.props.renderItemContainer(props, parentProps, children) || React4.createElement(react_native_1.View, __assign2({}, props), children);
+            return this.props.renderItemContainer && this.props.renderItemContainer(props, parentProps, children) || React3.createElement(react_native_1.View, __assign2({}, props), children);
           };
           return ViewRenderer2;
         }(BaseViewRenderer_1.default)
@@ -11137,7 +11137,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       });
       var debounce = require_lodash2();
       var PropTypes = require_prop_types();
-      var React4 = require_react();
+      var React3 = require_react();
       var ts_object_utils_1 = require_dist();
       var ContextProvider_1 = require_ContextProvider();
       var DataProvider_1 = require_DataProvider();
@@ -11463,7 +11463,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
           };
           RecyclerListView2.prototype.renderCompat = function() {
             var _this = this;
-            return React4.createElement(ScrollComponent_1.default, __assign2({
+            return React3.createElement(ScrollComponent_1.default, __assign2({
               ref: function ref(scrollComponent) {
                 return _this._scrollComponent = scrollComponent;
               }
@@ -11658,7 +11658,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               if (!this.props.forceNonDeterministicRendering) {
                 this._checkExpectedDimensionDiscrepancy(itemRect, type, dataIndex);
               }
-              return React4.createElement(ViewRenderer_1.default, {
+              return React3.createElement(ViewRenderer_1.default, {
                 key,
                 data,
                 dataHasChanged: this._dataHasChanged,
@@ -11870,7 +11870,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       Object.defineProperty(exports, "__esModule", {
         value: true
       });
-      var React4 = require_react();
+      var React3 = require_react();
       var BaseScrollView = (
         /** @class */
         function(_super) {
@@ -11879,7 +11879,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
             return _super.call(this, props) || this;
           }
           return BaseScrollView2;
-        }(React4.Component)
+        }(React3.Component)
       );
       exports.default = BaseScrollView;
     }
@@ -12169,7 +12169,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
         value: true
       });
       exports.StickyType = void 0;
-      var React4 = require_react();
+      var React3 = require_react();
       var react_native_1 = require_react_native();
       var RecyclerListViewExceptions_1 = require_RecyclerListViewExceptions();
       var CustomError_1 = require_CustomError();
@@ -12229,7 +12229,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
                 this.containerPosition
               ]
             ];
-            var content = React4.createElement(react_native_1.Animated.View, {
+            var content = React3.createElement(react_native_1.Animated.View, {
               style: containerStyle
             }, this.stickyVisiblity ? this._renderSticky() : null);
             if (this.props.renderContainer) {
@@ -12264,8 +12264,8 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               if (this._previousHeight && this._currentYd && scrollY_1 && scrollY_1 < this._currentYd) {
                 if (scrollY_1 > this._currentYd - this._previousHeight) {
                   this.currentIndex -= this.stickyTypeMultiplier;
-                  var translate3 = (scrollY_1 - this._currentYd + this._previousHeight) * (-1 * this.stickyTypeMultiplier);
-                  this._stickyViewOffset.setValue(translate3);
+                  var translate = (scrollY_1 - this._currentYd + this._previousHeight) * (-1 * this.stickyTypeMultiplier);
+                  this._stickyViewOffset.setValue(translate);
                   this._computeLayouts();
                   this.stickyViewVisible(true);
                 }
@@ -12280,8 +12280,8 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               var scrollY_2 = this.getScrollY(offsetY, this._scrollableHeight);
               if (this._currentHeight && this._nextYd && scrollY_2 && scrollY_2 + this._currentHeight > this._nextYd) {
                 if (scrollY_2 <= this._nextYd) {
-                  var translate3 = (scrollY_2 - this._nextYd + this._currentHeight) * (-1 * this.stickyTypeMultiplier);
-                  this._stickyViewOffset.setValue(translate3);
+                  var translate = (scrollY_2 - this._nextYd + this._currentHeight) * (-1 * this.stickyTypeMultiplier);
+                  this._stickyViewOffset.setValue(translate);
                 } else if (scrollY_2 > this._nextYd) {
                   this.currentIndex += this.stickyTypeMultiplier;
                   this._stickyViewOffset.setValue(0);
@@ -12604,7 +12604,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       Object.defineProperty(exports, "__esModule", {
         value: true
       });
-      var React4 = require_react();
+      var React3 = require_react();
       var PropTypes = require_prop_types();
       var react_native_1 = require_react_native();
       var StickyHeader_1 = require_StickyHeader();
@@ -12694,7 +12694,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               }
             };
             _this._assertChildType = function() {
-              if (React4.Children.count(_this.props.children) !== 1 || !_this._isChildRecyclerInstance()) {
+              if (React3.Children.count(_this.props.children) !== 1 || !_this._isChildRecyclerInstance()) {
                 throw new CustomError_1.default(RecyclerListViewExceptions_1.default.wrongStickyChildTypeException);
               }
             };
@@ -12758,18 +12758,18 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
           StickyContainer2.prototype.renderCompat = function() {
             var _this = this;
             this._assertChildType();
-            var recycler = React4.cloneElement(this.props.children, __assign2(__assign2({}, this.props.children.props), {
+            var recycler = React3.cloneElement(this.props.children, __assign2(__assign2({}, this.props.children.props), {
               ref: this._getRecyclerRef,
               onVisibleIndicesChanged: this._onVisibleIndicesChanged,
               onScroll: this._onScroll,
               applyWindowCorrection: this._applyWindowCorrection,
               rowRenderer: this._rlvRowRenderer
             }));
-            return React4.createElement(react_native_1.View, {
+            return React3.createElement(react_native_1.View, {
               style: this.props.style ? this.props.style : {
                 flex: 1
               }
-            }, recycler, this.props.stickyHeaderIndices ? React4.createElement(StickyHeader_1.default, {
+            }, recycler, this.props.stickyHeaderIndices ? React3.createElement(StickyHeader_1.default, {
               ref: function ref(stickyHeaderRef) {
                 return _this._getStickyHeaderRef(stickyHeaderRef);
               },
@@ -12784,7 +12784,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               overrideRowRenderer: this.props.overrideRowRenderer,
               renderContainer: this.props.renderStickyContainer,
               getWindowCorrection: this._getCurrentWindowCorrection
-            }) : null, this.props.stickyFooterIndices ? React4.createElement(StickyFooter_1.default, {
+            }) : null, this.props.stickyFooterIndices ? React3.createElement(StickyFooter_1.default, {
               ref: function ref(stickyFooterRef) {
                 return _this._getStickyFooterRef(stickyFooterRef);
               },
@@ -15837,7 +15837,7 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
       }, {
         afterAppRender(context) {
           return _async_to_generator(function* () {
-            var { patcher: patcher7, revenge: { assets, modules: modules3, ui: { settings: sui } } } = context;
+            var { patcher: patcher6, revenge: { assets, modules: modules3, ui: { settings: sui } } } = context;
             var contributors = /* @__PURE__ */ new Set();
             for (var member of Object.values(contributors_default).flat()) {
               if (!member.icon || contributors.has(member.name)) continue;
@@ -15909,8 +15909,8 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
               }),
               set: (v2) => rendererConfig = v2
             });
-            patcher7.after(SettingsOverviewScreen, "default", (_3, children) => {
-              var registeredCustomRows = new Set(Object.values(customData.sections).flatMap(({ settings: settings3 }) => Object.keys(settings3)));
+            patcher6.after(SettingsOverviewScreen, "default", (_3, children) => {
+              var registeredCustomRows = new Set(Object.values(customData.sections).flatMap(({ settings: settings2 }) => Object.keys(settings2)));
               var { sections } = findInReactTree(children, (i) => i.props?.sections).props;
               if (sections.findIndex((section2) => section2.settings.some((setting) => registeredCustomRows.has(setting))) !== -1) return;
               var index = -~sections.findIndex((section2) => section2.settings.includes("ACCOUNT")) || 1;
@@ -16566,9 +16566,9 @@ Type: ${asset.type}`,
   });
 
   // src/plugins/developer-settings/index.tsx
-  function setupDebugger({ patcher: patcher7, cleanup }) {
+  function setupDebugger({ patcher: patcher6, cleanup }) {
     var debuggerCleanups = /* @__PURE__ */ new Set();
-    patcher7.before(globalThis, "nativeLoggingHook", ([message2, level]) => {
+    patcher6.before(globalThis, "nativeLoggingHook", ([message2, level]) => {
       if (DebuggerContext.ws?.readyState === WebSocket.OPEN) DebuggerContext.ws.send(JSON.stringify({
         level: level === 3 ? "error" : level === 2 ? "warn" : "info",
         message: message2
@@ -16576,8 +16576,8 @@ Type: ${asset.type}`,
     }, "loggerPatch");
     globalThis.reload = () => BundleUpdaterManager.reload();
     globalThis.patcher = {
-      snipe: (object2, key, callback) => debuggerCleanups.add(patcher7.after(object2, key, callback ?? ((args, ret) => console.log("[SNIPER]", args, ret)), "revenge.plugins.developer-settings.debugger.patcher.snipe")),
-      noop: (object2, key) => debuggerCleanups.add(patcher7.instead(object2, key, () => void 0, "revenge.plugins.developer-settings.debugger.patcher.noop")),
+      snipe: (object2, key, callback) => debuggerCleanups.add(patcher6.after(object2, key, callback ?? ((args, ret) => console.log("[SNIPER]", args, ret)), "revenge.plugins.developer-settings.debugger.patcher.snipe")),
+      noop: (object2, key) => debuggerCleanups.add(patcher6.instead(object2, key, () => void 0, "revenge.plugins.developer-settings.debugger.patcher.noop")),
       wipe: () => {
         for (var c2 of debuggerCleanups) c2();
         debuggerCleanups.clear();
@@ -16752,9 +16752,9 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.0",
         icon: "EyeIcon"
       }, {
-        beforeAppRender({ revenge: { modules: modules3 }, patcher: patcher7, storage }) {
+        beforeAppRender({ revenge: { modules: modules3 }, patcher: patcher6, storage }) {
           var http = modules3.findByProps("HTTP", "post");
-          patcher7.instead(http.HTTP, "post", (args, original) => {
+          patcher6.instead(http.HTTP, "post", (args, original) => {
             var { url } = args?.[0] ?? {};
             if (url?.startsWith("/science") && storage.blockScience) {
               if (storage.countRequests) storage.blockedRequests++;
@@ -16831,339 +16831,6 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     }
   });
 
-  // src/plugins/vengeance/dislate/api/DeepL.ts
-  var API_URL, translate, DeepL_default;
-  var init_DeepL = __esm({
-    "src/plugins/vengeance/dislate/api/DeepL.ts"() {
-      "use strict";
-      init_async_to_generator();
-      API_URL = "https://deeplx.vercel.app/translate";
-      translate = /* @__PURE__ */ function() {
-        var _ref = _async_to_generator(function* (text, source_lang = "auto", target_lang, original = false) {
-          try {
-            if (original) return {
-              source_lang,
-              text
-            };
-            var data = yield (yield fetch(API_URL, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                text,
-                source_lang,
-                target_lang
-              })
-            })).json();
-            if (data.code !== 200) throw Error(`Failed to translate text from DeepL: ${data.message}`);
-            return {
-              source_lang,
-              text: data.data
-            };
-          } catch (e) {
-            throw Error(`Failed to fetch from DeepL: ${e}`);
-          }
-        });
-        return function translate3(text) {
-          return _ref.apply(this, arguments);
-        };
-      }();
-      DeepL_default = {
-        translate
-      };
-    }
-  });
-
-  // src/plugins/vengeance/dislate/api/GTranslate.ts
-  var translate2, GTranslate_default;
-  var init_GTranslate = __esm({
-    "src/plugins/vengeance/dislate/api/GTranslate.ts"() {
-      "use strict";
-      init_async_to_generator();
-      translate2 = /* @__PURE__ */ function() {
-        var _ref = _async_to_generator(function* (text, source_lang = "auto", target_lang, original = false) {
-          try {
-            if (original) return {
-              source_lang,
-              text
-            };
-            var API_URL2 = "https://translate.googleapis.com/translate_a/single?" + new URLSearchParams({
-              client: "gtx",
-              sl: source_lang,
-              tl: target_lang,
-              dt: "t",
-              dj: "1",
-              source: "input",
-              q: text
-            });
-            var data = yield (yield fetch(API_URL2)).json();
-            return {
-              source_lang,
-              text: data.sentences.map((s) => s.trans).join("")
-            };
-          } catch (e) {
-            throw Error(`Failed to fetch from Google Translate: ${e}`);
-          }
-        });
-        return function translate3(text) {
-          return _ref.apply(this, arguments);
-        };
-      }();
-      GTranslate_default = {
-        translate: translate2
-      };
-    }
-  });
-
-  // src/plugins/vengeance/dislate/api/index.ts
-  var init_api = __esm({
-    "src/plugins/vengeance/dislate/api/index.ts"() {
-      "use strict";
-      init_DeepL();
-      init_GTranslate();
-    }
-  });
-
-  // src/plugins/vengeance/dislate/patches/ActionSheet.tsx
-  var import_react_native20, patcher5, LazyActionSheet, ActionSheetRow, MessageStore, ChannelStore, styles7, cachedData, ActionSheet_default;
-  var init_ActionSheet = __esm({
-    "src/plugins/vengeance/dislate/patches/ActionSheet.tsx"() {
-      "use strict";
-      init_async_to_generator();
-      init_react_jsx_runtime();
-      init_finders();
-      init_common();
-      init_colors();
-      init_src5();
-      init_components();
-      init_react2();
-      init_dislate();
-      init_api();
-      init_common();
-      import_react_native20 = __toESM(require_react_native(), 1);
-      init_src2();
-      patcher5 = createPatcherInstance("ActionSheetPatch");
-      LazyActionSheet = findByProps("openLazy", "hideActionSheet");
-      ActionSheetRow = findByProps("ActionSheetRow")?.ActionSheetRow ?? TableRow;
-      MessageStore = findByStoreName("MessageStore");
-      ChannelStore = findByStoreName("ChannelStore");
-      styles7 = import_react_native20.StyleSheet.create({
-        iconComponent: {
-          width: 24,
-          height: 24,
-          tintColor: SemanticColor.INTERACTIVE_NORMAL
-        }
-      });
-      cachedData = [];
-      ActionSheet_default = () => patcher5.before("openLazy", LazyActionSheet, ([component, key, msg]) => {
-        var message2 = msg?.message;
-        if (key !== "MessageLongPressActionSheet" || !message2) return;
-        component.then((instance) => {
-          var unpatch2 = patcher5.after("default", instance, (_3, component2) => {
-            import_react.default.useEffect(() => () => {
-              unpatch2();
-            }, []);
-            var buttons = findInReactTree(component2, (x2) => x2?.[0]?.type?.name === "ButtonRow");
-            if (!buttons) return;
-            var position = Math.max(buttons.findIndex((x2) => x2.props.message === intl.t["MARK_UNREAD"]()), 0);
-            var originalMessage = MessageStore.getMessage(message2.channel_id, message2.id);
-            if (!originalMessage?.content && !message2.content) return;
-            var messageId = originalMessage?.id ?? message2.id;
-            var messageContent = originalMessage?.content ?? message2.content;
-            var existingCachedObject = cachedData.find((o) => Object.keys(o)[0] === messageId);
-            var translateType = existingCachedObject ? "Revert" : "Translate";
-            var icon = translateType === "Translate" ? getAssetIndexByName("ic_locale_24px") : getAssetIndexByName("ic_highlight");
-            var translate3 = /* @__PURE__ */ function() {
-              var _ref = _async_to_generator(function* () {
-                try {
-                  var target_lang = settings2.targetLang;
-                  var isTranslated = translateType === "Translate";
-                  var translation;
-                  switch (settings2.translator) {
-                    case 0:
-                      console.log("Translating with DeepL: ", originalMessage.content);
-                      translation = yield DeepL_default.translate(originalMessage.content, void 0, target_lang, !isTranslated);
-                      break;
-                    case 1:
-                      console.log("Translating with GTranslate: ", originalMessage.content);
-                      translation = yield GTranslate_default.translate(originalMessage.content, void 0, target_lang, !isTranslated);
-                      break;
-                  }
-                  FluxDispatcher.dispatch({
-                    type: "MESSAGE_UPDATE",
-                    message: {
-                      ...originalMessage,
-                      content: `${isTranslated ? translation.text : existingCachedObject[messageId]} ${isTranslated ? `\`[${target_lang?.toLowerCase()}]\`` : ""}`,
-                      guild_id: ChannelStore.getChannel(originalMessage.channel_id).guild_id
-                    },
-                    log_edit: false,
-                    otherPluginBypass: true
-                  });
-                  if (isTranslated) {
-                    cachedData.unshift({
-                      [messageId]: messageContent
-                    });
-                  } else {
-                    cachedData = cachedData.filter((e) => e !== existingCachedObject);
-                  }
-                } catch (e) {
-                  toasts.open({
-                    key: "revenge.plugins.translation-settings.translate-failed",
-                    content: "Failed to translate message. Please check Debug Logs for more info.",
-                    icon: getAssetIndexByName("Small")
-                  });
-                  Logger.error(e);
-                } finally {
-                  return LazyActionSheet.hideActionSheet();
-                }
-              });
-              return function translate4() {
-                return _ref.apply(this, arguments);
-              };
-            }();
-            buttons.splice(position, 0, /* @__PURE__ */ jsx(ActionSheetRow, {
-              label: `${translateType} Message`,
-              icon: /* @__PURE__ */ jsx(ActionSheetRow.Icon, {
-                source: icon,
-                IconComponent: () => /* @__PURE__ */ jsx(import_react_native.default.Image, {
-                  resizeMode: "cover",
-                  style: styles7.iconComponent,
-                  source: icon
-                })
-              }),
-              onPress: translate3
-            }));
-          });
-        });
-      });
-    }
-  });
-
-  // src/plugins/vengeance/dislate/settings/index.tsx
-  var import_react19, import_react_native21, settingsKeys, Settings, settings_default;
-  var init_settings3 = __esm({
-    "src/plugins/vengeance/dislate/settings/index.tsx"() {
-      "use strict";
-      init_react_jsx_runtime();
-      import_react19 = __toESM(require_react(), 1);
-      import_react_native21 = __toESM(require_react_native(), 1);
-      init_src6();
-      init_Wrapper();
-      init_components();
-      init_src5();
-      settingsKeys = {
-        sourceLang: "source_lang",
-        targetLang: "target_lang",
-        translator: "translator"
-      };
-      Settings = ({ storage }) => {
-        useObservable([
-          storage
-        ]);
-        var settingsList = [
-          {
-            label: "Source Language",
-            subLabel: "Set the source language (default: auto-detect)",
-            icon: "LanguageIcon",
-            value: settingsKeys.sourceLang
-          },
-          {
-            label: "Target Language",
-            subLabel: "Set the target language for translations",
-            icon: "TargetIcon",
-            value: settingsKeys.targetLang
-          },
-          {
-            label: "Translator",
-            subLabel: "Choose DeepL (0) or Google Translate (1)",
-            icon: "TranslatorIcon",
-            value: settingsKeys.translator
-          }
-        ];
-        return /* @__PURE__ */ jsx(import_react_native21.ScrollView, {
-          children: /* @__PURE__ */ jsxs(PageWrapper, {
-            children: [
-              /* @__PURE__ */ jsx(Card, {
-                children: /* @__PURE__ */ jsx(Text, {
-                  variant: "text-md/medium",
-                  children: "Configure your translation plugin settings below."
-                })
-              }),
-              /* @__PURE__ */ jsx(TableRowGroup, {
-                title: "Settings",
-                children: settingsList.map(({ label, subLabel, icon, value }) => /* @__PURE__ */ jsx(TableSwitchRow, {
-                  label,
-                  subLabel,
-                  icon: /* @__PURE__ */ jsx(TableRowIcon, {
-                    source: getAssetIndexByName(icon)
-                  }),
-                  value: storage[value],
-                  onValueChange: (v2) => storage[value] = v2
-                }, value))
-              })
-            ]
-          })
-        });
-      };
-      settings_default = Settings;
-    }
-  });
-
-  // src/plugins/vengeance/dislate/index.ts
-  var settingsKeys2, settings2;
-  var init_dislate = __esm({
-    "src/plugins/vengeance/dislate/index.ts"() {
-      "use strict";
-      init_internals();
-      init_ActionSheet();
-      init_settings3();
-      init_src6();
-      settingsKeys2 = {
-        sourceLang: "source_lang",
-        targetLang: "target_lang",
-        translator: "translator"
-      };
-      settings2 = createStorage("translation_settings", {
-        initial: {
-          sourceLang: "auto",
-          targetLang: "EN",
-          translator: 0
-        }
-      });
-      registerPlugin({
-        name: "Translation Plugin",
-        author: "Your Name",
-        description: "Translate messages directly within Discord.",
-        id: "revenge.translation",
-        version: "1.0.0",
-        icon: "TranslateIcon"
-      }, {
-        afterAppRender({ cleanup }) {
-          settings2.sourceLang = settings2.sourceLang || "auto";
-          settings2.targetLang = settings2.targetLang || "EN";
-          settings2.translator = settings2.translator || 0;
-          var patches = [
-            ActionSheet_default()
-          ];
-          cleanup(() => patches.forEach((unpatch2) => unpatch2()));
-        },
-        initializeStorage() {
-          return {
-            [settingsKeys2.sourceLang]: "auto",
-            [settingsKeys2.targetLang]: "EN",
-            [settingsKeys2.translator]: 0
-          };
-        },
-        SettingsComponent: settings_default
-      }, {
-        external: false,
-        manageable: true,
-        enabled: true
-      });
-    }
-  });
-
   // src/plugins/vengeance/silenttyping/index.ts
   var init_silenttyping = __esm({
     "src/plugins/vengeance/silenttyping/index.ts"() {
@@ -17174,17 +16841,16 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         author: "Purple_\u039Eye\u2122",
         description: "Others won't see you typing.",
         id: "vengeance.silenttyping",
-        version: "1.0.0",
+        version: "1.0.2",
         icon: "EyeSlashIcon"
       }, {
-        afterAppRender({ patcher: patcher7, revenge: revenge2 }) {
+        afterAppRender({ patcher: patcher6, revenge: revenge2 }) {
           var Typing = revenge2.modules.findByProps("startTyping", "stopTyping");
           if (!Typing) return;
-          var patches = [
+          [
             "startTyping",
             "stopTyping"
-          ].map((method) => patcher7.instead(Typing, method, (...args) => {
-            return;
+          ].forEach((method) => patcher6.instead(Typing, method, () => {
           }));
         }
       }, {
@@ -17196,7 +16862,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/quickdelete/index.tsx
-  var import_react_native22, autoConfirmKeys;
+  var import_react_native20, autoConfirmKeys;
   var init_quickdelete = __esm({
     "src/plugins/vengeance/quickdelete/index.tsx"() {
       "use strict";
@@ -17205,7 +16871,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_common();
       init_src5();
       init_components();
-      import_react_native22 = __toESM(require_react_native(), 1);
+      import_react_native20 = __toESM(require_react_native(), 1);
       init_src6();
       init_Wrapper();
       autoConfirmKeys = {
@@ -17220,7 +16886,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.3.0",
         icon: "TrashIcon"
       }, {
-        afterAppRender({ revenge: { modules: modules3 }, patcher: patcher7, cleanup, storage }) {
+        afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
           var Popup = modules3.findByProps("show", "openLazy");
           if (!Popup) return console.error("[QuickDelete] Popup module not found");
           var locale = intl?.intl?.currentLocale;
@@ -17232,7 +16898,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             type,
             intl?.t?.[key]?.(locale)?.reserialize?.()?.trim()
           ]));
-          cleanup(patcher7.instead(Popup, "show", ([popup], original) => {
+          cleanup(patcher6.instead(Popup, "show", ([popup], original) => {
             var titleOrBody = [
               popup?.children?.props?.title?.trim(),
               popup?.body?.trim()
@@ -17255,7 +16921,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           useObservable([
             storage
           ]);
-          var settings3 = [
+          var settings2 = [
             {
               label: "Auto-confirm message deletion",
               subLabel: "Automatically confirms deletion popups for messages",
@@ -17269,7 +16935,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
               value: "autoConfirmEmbed"
             }
           ];
-          return /* @__PURE__ */ jsx(import_react_native22.ScrollView, {
+          return /* @__PURE__ */ jsx(import_react_native20.ScrollView, {
             children: /* @__PURE__ */ jsxs(PageWrapper, {
               children: [
                 /* @__PURE__ */ jsx(Card, {
@@ -17280,7 +16946,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                 }),
                 /* @__PURE__ */ jsx(TableRowGroup, {
                   title: "Settings",
-                  children: settings3.map(({ label, subLabel, icon, value }) => /* @__PURE__ */ jsx(TableSwitchRow, {
+                  children: settings2.map(({ label, subLabel, icon, value }) => /* @__PURE__ */ jsx(TableSwitchRow, {
                     label,
                     subLabel,
                     icon: /* @__PURE__ */ jsx(TableRowIcon, {
@@ -17303,7 +16969,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/freenitro/patches/extra/appIcons.ts
-  function patchAppIcons({ revenge: { modules: modules3 }, storage, patcher: patcher7, cleanup }) {
+  function patchAppIcons({ revenge: { modules: modules3 }, storage, patcher: patcher6, cleanup }) {
     var icons = modules3.findByProps("getIcons", "getOfficialAlternateIcons");
     var iconsIds = modules3.findByProps("FreemiumAppIconIds", "MasterAppIconIds");
     var upsellObj = modules3.findByProps("useIsPremiumAppIconUpsellEnabled");
@@ -17316,20 +16982,20 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         return patched2 && storage.extra.appIcons ? iconsIds.MasterAppIconIds : _Freemiums;
       }
     });
-    patcher7.after(icons, "getIcons", (_3, ret) => storage.extra.appIcons ? ret.map((x2) => ({
+    patcher6.after(icons, "getIcons", (_3, ret) => storage.extra.appIcons ? ret.map((x2) => ({
       ...x2,
       isPremium: false
     })) : ret, "appicons.getIcons");
-    patcher7.after(icons, "getOfficialAlternateIcons", (_3, ret) => storage.extra.appIcons ? ret.map((x2) => ({
+    patcher6.after(icons, "getOfficialAlternateIcons", (_3, ret) => storage.extra.appIcons ? ret.map((x2) => ({
       ...x2,
       isPremium: false
     })) : ret, "appicons.getOfficialAlternateIcons");
-    patcher7.after(icons, "getIconById", (_3, ret) => storage.extra.appIcons ? {
+    patcher6.after(icons, "getIconById", (_3, ret) => storage.extra.appIcons ? {
       ...ret,
       isPremium: false
     } : ret, "appicons.getIconById");
-    patcher7.instead(upsellObj, "useIsPremiumAppIconUpsellEnabled", () => storage.extra.appIcons, "appicons.upsellObj");
-    patcher7.instead(upsellComponent, "default", function(args, original) {
+    patcher6.instead(upsellObj, "useIsPremiumAppIconUpsellEnabled", () => storage.extra.appIcons, "appicons.upsellObj");
+    patcher6.instead(upsellComponent, "default", function(args, original) {
       return storage.extra.appIcons ? null : original.apply(this, args);
     }, "appicons.upsellComponent");
   }
@@ -17340,9 +17006,9 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/freenitro/patches/extra/nitroThemes.ts
-  function patchNitroThemes({ revenge: { modules: modules3 }, patcher: patcher7, storage }) {
+  function patchNitroThemes({ revenge: { modules: modules3 }, patcher: patcher6, storage }) {
     var getPremiumSubscription = modules3.findProp("getPremiumSubscription");
-    patcher7.before(FluxDispatcher, "dispatch", (args) => {
+    patcher6.before(FluxDispatcher, "dispatch", (args) => {
       var [event] = args;
       if (event.type === "SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE" && event.changes.appearance?.settings.clientThemeSettings?.backgroundGradientPresetId && (getPremiumSubscription() || storage.bypassNitroCheck)) {
         event.changes.appearance.shouldSync = false;
@@ -17358,7 +17024,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/freenitro/patches/fakeify.tsx
-  function patchFakeify({ revenge: { modules: modules3 }, patcher: patcher7, storage }, emojiPickerOpen) {
+  function patchFakeify({ revenge: { modules: modules3 }, patcher: patcher6, storage }, emojiPickerOpen) {
     var messagesModule = modules3.findByProps("sendMessage", "editMessage");
     var EmojiPickerList = modules3.findByTypeName("EmojiPickerList");
     var ChatInputSendButton = modules3.findByTypeName("ChatInputSendButton");
@@ -17391,7 +17057,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       if (hasNitro || twitchSubEmote) return e.guildId === guildId() || hasExternalEmojiPerms(channelId);
       return !e.animated && e.guildId === guildId();
     }
-    patcher7.instead(messagesModule, "sendStickers", /* @__PURE__ */ function() {
+    patcher6.instead(messagesModule, "sendStickers", /* @__PURE__ */ function() {
       var _ref = _async_to_generator(function* (args, original) {
         if (!storage.stickers.enabled) return original.apply(this, args);
         var [channelId, stickerIds, extra, something] = args;
@@ -17416,21 +17082,21 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         return _ref.apply(this, arguments);
       };
     }(), "fakeify.sendStickers");
-    patcher7.instead(EmojiPickerList, "type", function(args, original) {
+    patcher6.instead(EmojiPickerList, "type", function(args, original) {
       var [props] = args;
       if (!storage.emoji.enabled || !props?.categories || !props.channel) return original.apply(this, args);
       for (var category of props.categories) {
         category.isNitroLocked = false;
         category.emojisDisabled?.clear();
       }
-      (0, import_react20.useEffect)(() => {
+      (0, import_react18.useEffect)(() => {
         emojiPickerOpen.current.add("picker");
         return () => void emojiPickerOpen.current.delete("picker");
       }, []);
       return original.apply(this, args);
     }, "fakeify.EmojiPickerList");
-    patcher7.before(ChatInputSendButton, "type", ([{ messageHasContent }]) => void (messageHasContent ? emojiPickerOpen.current.add("chat") : emojiPickerOpen.current.delete("chat")), "fakeify.ChatInputSendButton");
-    patcher7.instead(messagesModule, "sendMessage", /* @__PURE__ */ function() {
+    patcher6.before(ChatInputSendButton, "type", ([{ messageHasContent }]) => void (messageHasContent ? emojiPickerOpen.current.add("chat") : emojiPickerOpen.current.delete("chat")), "fakeify.ChatInputSendButton");
+    patcher6.instead(messagesModule, "sendMessage", /* @__PURE__ */ function() {
       var _ref = _async_to_generator(function* (args, original) {
         if (!storage.emoji.enabled) return yield original.apply(this, args);
         var [channelId, data] = args;
@@ -17457,7 +17123,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         return _ref.apply(this, arguments);
       };
     }(), "fakeify.sendMessage");
-    patcher7.instead(messagesModule, "editMessage", /* @__PURE__ */ function() {
+    patcher6.instead(messagesModule, "editMessage", /* @__PURE__ */ function() {
       var _ref = _async_to_generator(function* (args, original) {
         if (!storage.emoji.enabled) return yield original.apply(this, args);
         var [channelId, _3, data] = args;
@@ -17486,7 +17152,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     }(), "fakeify.editMessage");
   }
   function NoEmbedPermsAlertModal({ outcome, disable }) {
-    (0, import_react20.useEffect)(() => () => outcome(false), []);
+    (0, import_react18.useEffect)(() => () => outcome(false), []);
     var [meow, setMeow] = React.useState(false);
     FormSwitch2;
     return /* @__PURE__ */ jsx(AlertModal, {
@@ -17522,7 +17188,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       disable
     })));
   }
-  var import_react20, FormCheckboxRow;
+  var import_react18, FormCheckboxRow;
   var init_fakeify = __esm({
     "src/plugins/vengeance/freenitro/patches/fakeify.tsx"() {
       "use strict";
@@ -17532,13 +17198,13 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_components();
       init_finders();
       init_components3();
-      import_react20 = __toESM(require_react(), 1);
+      import_react18 = __toESM(require_react(), 1);
       FormCheckboxRow = findProp("FormCheckboxRow");
     }
   });
 
   // src/plugins/vengeance/freenitro/patches/realify.tsx
-  function patchRealify({ revenge: { modules: modules3 }, storage, patcher: patcher7 }) {
+  function patchRealify({ revenge: { modules: modules3 }, storage, patcher: patcher6 }) {
     var StickerDetailActionSheet = modules3.findByTypeName("StickerDetailActionSheet");
     var getCustomEmojiById = modules3.findProp("getCustomEmojiById");
     var getStickerById = modules3.findProp("getStickerById");
@@ -17593,7 +17259,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       }
       return null;
     }
-    patcher7.after(RowManager, "generate", (_3, row) => {
+    patcher6.after(RowManager, "generate", (_3, row) => {
       if (row.type !== 1 || !row.message) return;
       var { message: message2 } = row;
       var membeds = message2.embeds ?? [];
@@ -17712,7 +17378,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       }
       return row;
     }, "realify.RowGenerator");
-    patcher7.before(import_react_native23.View, "render", (args) => {
+    patcher6.before(import_react_native21.View, "render", (args) => {
       var props = args?.[0];
       var textMain = props?.children?.[0]?.props;
       var textSub = props?.children?.[1]?.props;
@@ -17723,7 +17389,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         return args;
       }
     }, "realify.View");
-    patcher7.after(StickerDetailActionSheet, "type", ([props], ret) => {
+    patcher6.after(StickerDetailActionSheet, "type", ([props], ret) => {
       var sticker = ret?.props?.children?.props?.children?.props?.sticker;
       if (sticker?.name && props?.renderableSticker?.name) {
         sticker.name = props.renderableSticker.name;
@@ -17731,11 +17397,11 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       }
     }, "realify.StickerDetailActionSheet");
   }
-  var import_react_native23, cdnLinks, emojiUrlRegex, stickerUrlRegex, attachmentUrlRegex, isFakerAlt, shouldDebug;
+  var import_react_native21, cdnLinks, emojiUrlRegex, stickerUrlRegex, attachmentUrlRegex, isFakerAlt, shouldDebug;
   var init_realify = __esm({
     "src/plugins/vengeance/freenitro/patches/realify.tsx"() {
       "use strict";
-      import_react_native23 = __toESM(require_react_native(), 1);
+      import_react_native21 = __toESM(require_react_native(), 1);
       init_debugger();
       cdnLinks = [
         "cdn.discordapp.com",
@@ -17750,7 +17416,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/freenitro/index.tsx
-  var import_react_native24, emojiSizeLadder, stickerSizeLadder, useSettingsStyles, plugin3;
+  var import_react_native22, emojiSizeLadder, stickerSizeLadder, useSettingsStyles, plugin3;
   var init_freenitro = __esm({
     "src/plugins/vengeance/freenitro/index.tsx"() {
       "use strict";
@@ -17761,7 +17427,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_internals();
       init_src6();
       init_colors();
-      import_react_native24 = __toESM(require_react_native(), 1);
+      import_react_native22 = __toESM(require_react_native(), 1);
       init_Wrapper();
       init_appIcons();
       init_nitroThemes();
@@ -17804,9 +17470,9 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       }, {
         beforeAppRender(context) {
           var _this, _loop = function(key2, predicate2) {
-            patcher7.instead(canUseObj, key2, (args, original) => predicate2() || original.apply(_this, args));
+            patcher6.instead(canUseObj, key2, (args, original) => predicate2() || original.apply(_this, args));
           };
-          var { revenge: { modules: modules3 }, storage, patcher: patcher7 } = context;
+          var { revenge: { modules: modules3 }, storage, patcher: patcher6 } = context;
           var emojiPickerOpen = {
             current: /* @__PURE__ */ new Set()
           };
@@ -17870,7 +17536,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             storage
           ]);
           var settingsStyles = useSettingsStyles();
-          return /* @__PURE__ */ jsx(import_react_native24.ScrollView, {
+          return /* @__PURE__ */ jsx(import_react_native22.ScrollView, {
             children: /* @__PURE__ */ jsxs(PageWrapper, {
               children: [
                 /* @__PURE__ */ jsxs(TableRowGroup, {
@@ -17927,7 +17593,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                         children: storage.emoji.size
                       })
                     }),
-                    /* @__PURE__ */ jsx(import_react_native24.View, {
+                    /* @__PURE__ */ jsx(import_react_native22.View, {
                       style: settingsStyles.slider,
                       children: /* @__PURE__ */ jsx(Slider, {
                         value: emojiSizeLadder.indexOf(storage.emoji.size) + 1,
@@ -17971,7 +17637,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                         children: storage.stickers.size
                       })
                     }),
-                    /* @__PURE__ */ jsx(import_react_native24.View, {
+                    /* @__PURE__ */ jsx(import_react_native22.View, {
                       style: settingsStyles.slider,
                       children: /* @__PURE__ */ jsx(Slider, {
                         value: stickerSizeLadder.indexOf(storage.stickers.size) + 1,
@@ -18021,7 +17687,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                     })
                   ]
                 }),
-                /* @__PURE__ */ jsx(import_react_native24.View, {
+                /* @__PURE__ */ jsx(import_react_native22.View, {
                   style: {
                     height: 12
                   }
@@ -18040,7 +17706,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
 
   // src/plugins/vengeance/newplugins/index.tsx
   function NewPluginsAlert({ plugins }) {
-    var styles8 = useAlertStyles();
+    var styles7 = useAlertStyles();
     return /* @__PURE__ */ jsx(AlertModal, {
       title: "New Grub Alert",
       content: `${plugins.length} new plugin${plugins.length !== 1 ? "s have" : " has"} been added to Vengeance!`,
@@ -18053,9 +17719,9 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           direction: "horizontal",
           spacing: 8,
           children: [
-            /* @__PURE__ */ jsx(import_react_native25.Image, {
+            /* @__PURE__ */ jsx(import_react_native23.Image, {
               source: (pluh.icon && getAssetIndexByName(pluh.icon)) ?? getAssetIndexByName("UnknownGameIcon"),
-              style: styles8.icon
+              style: styles7.icon
             }),
             /* @__PURE__ */ jsxs(Stack, {
               direction: "vertical",
@@ -18094,7 +17760,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       })
     });
   }
-  var import_react_native25, useAlertStyles;
+  var import_react_native23, useAlertStyles;
   var init_newplugins = __esm({
     "src/plugins/vengeance/newplugins/index.tsx"() {
       "use strict";
@@ -18104,7 +17770,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_components();
       init_internals();
       init_colors();
-      import_react_native25 = __toESM(require_react_native(), 1);
+      import_react_native23 = __toESM(require_react_native(), 1);
       registerPlugin({
         name: "Plugin Notifier",
         author: "Vengeance",
@@ -18182,7 +17848,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/commands/cmds/debug.ts
-  var import_react_native26, MinimumSupportedBuildNumber2, getDeviceInfo, getDeviceManufacturer, debug_default;
+  var import_react_native24, MinimumSupportedBuildNumber2, getDeviceInfo, getDeviceManufacturer, debug_default;
   var init_debug = __esm({
     "src/plugins/vengeance/commands/cmds/debug.ts"() {
       "use strict";
@@ -18191,7 +17857,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_native();
       init_lazy();
       init_commands();
-      import_react_native26 = __toESM(require_react_native(), 1);
+      import_react_native24 = __toESM(require_react_native(), 1);
       MinimumSupportedBuildNumber2 = ReactNative.Platform.select({
         default: 254e3,
         ios: 66559
@@ -18211,7 +17877,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         execute([ephemeral], ctx) {
           var isOutdated = !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber2);
           var runtimeProps = HermesInternal.getRuntimeProperties();
-          var PlatformConstants = import_react_native26.Platform.constants;
+          var PlatformConstants = import_react_native24.Platform.constants;
           var content = [
             "**Vengeance Debug**",
             `> **Vengeance:** ${"d4ca2de"}${true ? "-dirty" : ""} (${__PYON_LOADER__.loaderName} v${__PYON_LOADER__.loaderVersion})`,
@@ -18275,7 +17941,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/commands/cmds/venfetch.ts
-  var import_react_native27, MinimumSupportedBuildNumber3, getDeviceInfo2, getDeviceManufacturer2, getCurrentUser, message, prime, colorRange, venfetch_default;
+  var import_react_native25, MinimumSupportedBuildNumber3, getDeviceInfo2, getDeviceManufacturer2, getCurrentUser, message, prime, colorRange, venfetch_default;
   var init_venfetch = __esm({
     "src/plugins/vengeance/commands/cmds/venfetch.ts"() {
       "use strict";
@@ -18285,7 +17951,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       init_lazy();
       init_commands();
       init_internals();
-      import_react_native27 = __toESM(require_react_native(), 1);
+      import_react_native25 = __toESM(require_react_native(), 1);
       MinimumSupportedBuildNumber3 = ReactNative.Platform.select({
         default: 254e3,
         ios: 66559
@@ -18330,7 +17996,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         execute(args, ctx) {
           var ephemeral = args.find((a) => a.name === "ephemeral");
           var color = args.find((a) => a.name === "color");
-          var PlatformConstants = import_react_native27.Platform.constants;
+          var PlatformConstants = import_react_native25.Platform.constants;
           var isOutdated = !(Number(ClientInfoModule.Build) > MinimumSupportedBuildNumber3);
           var allPlugins = Object.values(registeredPlugins);
           var externalPlugins = allPlugins.filter((plugin4) => plugin4.external && plugin4.enabled);
@@ -18408,8 +18074,8 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.0",
         icon: "SlashBoxIcon"
       }, {
-        afterAppRender({ patcher: patcher7 }) {
-          patcher7.after(commands, "getBuiltInCommands", (_3, ret) => {
+        afterAppRender({ patcher: patcher6 }) {
+          patcher6.after(commands, "getBuiltInCommands", (_3, ret) => {
             var lastId = Math.min(...ret.map((a) => Number(a.id))) - 1;
             var cmdussy = [
               ...cmds
@@ -18467,15 +18133,15 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.0",
         icon: "ic_message"
       }, {
-        beforeAppRender({ patcher: patcher7, revenge: { modules: modules3 } }) {
+        beforeAppRender({ patcher: patcher6, revenge: { modules: modules3 } }) {
           var Messages = modules3.findByFilePath("modules/main_tabs_v2/native/tabs/messages/Messages.tsx", true);
           var useTabBarTabOptions = modules3.findByName("useTabBarTabOptions");
           var SelectedGuildStore = revenge.modules.findByProps("getLastSelectedGuildId");
           var RouterUtils = modules3.findByProps("transitionTo");
           var NavigationBottomTabs = modules3.findByProps("createBottomTabNavigator");
           var navigation;
-          patcher7.after(NavigationBottomTabs, "createBottomTabNavigator", (_3, Tab) => {
-            patcher7.before(Tab, "Navigator", ([props]) => {
+          patcher6.after(NavigationBottomTabs, "createBottomTabNavigator", (_3, Tab) => {
+            patcher6.before(Tab, "Navigator", ([props]) => {
               var screens = props.children.props.children;
               var origTabBar = props.tabBar;
               props.tabBar = (tbProps) => {
@@ -18494,7 +18160,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
               }));
             });
           });
-          patcher7.instead(Messages, "type", ([props], orig) => {
+          patcher6.instead(Messages, "type", ([props], orig) => {
             if (props.renderedViaPlugin) return orig(props);
             setImmediate(() => {
               var lastSelectedGuildId = SelectedGuildStore.getLastSelectedGuildId();
@@ -18503,7 +18169,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             });
             return null;
           });
-          patcher7.instead(RouterUtils, "transitionTo", ([path, opts], orig) => {
+          patcher6.instead(RouterUtils, "transitionTo", ([path, opts], orig) => {
             if (path.startsWith("/channels/@me")) {
               if (opts?.navigationReplace) navigation.navigate(ScreenName);
               if (opts?.openChannel) orig(path, {
@@ -18512,7 +18178,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
               });
             } else orig(path, opts);
           });
-          patcher7.instead(modules3.findProp("Messages", "DragPreview"), "type", () => null);
+          patcher6.instead(modules3.findProp("Messages", "DragPreview"), "type", () => null);
         }
       }, {
         external: false,
@@ -18535,9 +18201,9 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.0",
         icon: "LaptopPhoneIcon"
       }, {
-        beforeAppRender({ patcher: patcher7, revenge: { modules: modules3 } }) {
+        beforeAppRender({ patcher: patcher6, revenge: { modules: modules3 } }) {
           var DevicesSetting = modules3.findByFilePath("modules/main_tabs_v2/native/settings/definitions/DevicesSetting.tsx", true);
-          patcher7.instead(DevicesSetting, "usePredicate", () => true);
+          patcher6.instead(DevicesSetting, "usePredicate", () => true);
         }
       }, {
         external: false,
@@ -18552,7 +18218,6 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     "src/plugins/vengeance/index.ts"() {
       "use strict";
       init_notrack();
-      init_dislate();
       init_silenttyping();
       init_quickdelete();
       init_freenitro();
@@ -18605,7 +18270,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           Promise.resolve().then(() => (init_jsx(), jsx_exports))
         ]);
         var ModulesLibrary = yield ModulesLibraryPromise;
-        var [{ startPlugins: startPlugins2, registerExternalPlugins: registerExternalPlugins2 }, { awaitStorage: awaitStorage2 }, { settings: settings3, pluginsStates: pluginsStates2 }] = yield Promise.all([
+        var [{ startPlugins: startPlugins2, registerExternalPlugins: registerExternalPlugins2 }, { awaitStorage: awaitStorage2 }, { settings: settings2, pluginsStates: pluginsStates2 }] = yield Promise.all([
           Promise.resolve().then(() => (init_src8(), src_exports6)),
           Promise.resolve().then(() => (init_src6(), src_exports4)),
           Promise.resolve().then(() => (init_src7(), src_exports5))
@@ -18625,7 +18290,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         yield Promise.resolve().then(() => (init_plugins2(), plugins_exports));
         yield registerExternalPlugins2();
         recordTimestamp("Plugins_Registered");
-        yield awaitStorage2(settings3, pluginsStates2);
+        yield awaitStorage2(settings2, pluginsStates2);
         recordTimestamp("Storage_Initialized");
         yield startPlugins2();
         recordTimestamp("Plugins_Started");
@@ -18644,7 +18309,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     ].join("\n"));
   }
   var requireFunc;
-  var patcher6 = createPatcherInstance("revenge.library.init");
+  var patcher5 = createPatcherInstance("revenge.library.init");
   var logger4 = createLogger("init");
   var ErrorTypeWhitelist = [
     ReferenceError,
@@ -18661,7 +18326,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
     recordTimestamp("Native_RequiredIndex");
     var batchedBridge = __fbBatchedBridge;
     var callQueue = [];
-    var unpatch2 = patcher6.instead(batchedBridge, "callFunctionReturnFlushedQueue", (args, orig) => {
+    var unpatch2 = patcher5.instead(batchedBridge, "callFunctionReturnFlushedQueue", (args, orig) => {
       if (args[0] === "AppRegistry" || !batchedBridge.getCallableModule(args[0])) {
         callQueue.push(args);
         return batchedBridge.flushedQueue();

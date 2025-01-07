@@ -17111,29 +17111,26 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/dislate/index.ts
-  var settingsKeys2, settings2, saveSettings;
+  var settingsKeys2, settings2;
   var init_dislate = __esm({
     "src/plugins/vengeance/dislate/index.ts"() {
       "use strict";
       init_internals();
       init_ActionSheet();
       init_settings3();
+      init_src6();
       settingsKeys2 = {
         sourceLang: "source_lang",
         targetLang: "target_lang",
         translator: "translator"
       };
-      settings2 = {
-        sourceLang: "auto",
-        targetLang: "EN",
-        translator: 0
-      };
-      saveSettings = () => {
-        var { storage } = (init_src6(), __toCommonJS(src_exports4));
-        storage.set(settingsKeys2.sourceLang, settings2.sourceLang);
-        storage.set(settingsKeys2.targetLang, settings2.targetLang);
-        storage.set(settingsKeys2.translator, settings2.translator);
-      };
+      settings2 = createStorage("translation_settings", {
+        initial: {
+          sourceLang: "auto",
+          targetLang: "EN",
+          translator: 0
+        }
+      });
       registerPlugin({
         name: "Translation Plugin",
         author: "Your Name",
@@ -17142,18 +17139,14 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.0",
         icon: "TranslateIcon"
       }, {
-        afterAppRender({ patcher: patcher7, cleanup, storage }) {
-          settings2.sourceLang = storage.get(settingsKeys2.sourceLang) || settings2.sourceLang;
-          settings2.targetLang = storage.get(settingsKeys2.targetLang) || settings2.targetLang;
-          settings2.translator = storage.get(settingsKeys2.translator) || settings2.translator;
+        afterAppRender({ patcher: patcher7, cleanup }) {
+          settings2.sourceLang = settings2.sourceLang || "auto";
+          settings2.targetLang = settings2.targetLang || "EN";
+          settings2.translator = settings2.translator || 0;
           var patches = [
             ActionSheet_default(settings2)
           ];
           cleanup(() => patches.forEach((unpatch2) => unpatch2()));
-          return {
-            settings: settings2,
-            saveSettings
-          };
         },
         initializeStorage() {
           return {

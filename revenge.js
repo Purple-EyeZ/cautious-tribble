@@ -16862,7 +16862,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/quickdelete/index.tsx
-  var import_react_native20, autoConfirmKeys;
+  var import_react_native20, autoConfirmKeys, getTranslations;
   var init_quickdelete = __esm({
     "src/plugins/vengeance/quickdelete/index.tsx"() {
       "use strict";
@@ -16878,12 +16878,16 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         embed: "vXZ+Fh",
         message: "AMvpS0"
       };
+      getTranslations = (keys, locale) => Object.fromEntries(Object.entries(keys).map(([type, key]) => [
+        type,
+        intl?.t?.[key]?.(locale)?.reserialize?.()?.trim()
+      ]));
       registerPlugin({
         name: "Quick Delete",
         author: "Purple_\u039Eye\u2122",
         description: "Automatically confirm message or embed deletion.",
         id: "vengeance.quickdelete",
-        version: "1.3.0",
+        version: "1.3.1",
         icon: "TrashIcon"
       }, {
         afterAppRender({ revenge: { modules: modules3 }, patcher: patcher6, cleanup, storage }) {
@@ -16894,10 +16898,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.error("[QuickDelete] Locale not found. Plugin initialization aborted.");
             return;
           }
-          var translations = Object.fromEntries(Object.entries(autoConfirmKeys).map(([type, key]) => [
-            type,
-            intl?.t?.[key]?.(locale)?.reserialize?.()?.trim()
-          ]));
+          var translations = getTranslations(autoConfirmKeys, locale);
           cleanup(patcher6.instead(Popup, "show", ([popup], original) => {
             var titleOrBody = [
               popup?.children?.props?.title?.trim(),

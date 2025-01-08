@@ -16850,12 +16850,17 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             var messageModule = findByProps2?.("onPress", "onLongPress");
             console.log("[TwoTap] Message Module:", messageModule);
             if (messageModule) {
-              console.log("[TwoTap] Message Module Props:", Object.keys(messageModule));
-            }
-            var messageRenderer = findByProps2?.("renderMessage");
-            console.log("[TwoTap] Message Renderer:", messageRenderer);
-            if (messageRenderer) {
-              console.log("[TwoTap] Renderer Props:", Object.keys(messageRenderer));
+              var props = Object.keys(messageModule);
+              console.log("[TwoTap] Message Module Props:", props);
+              props.forEach((prop) => {
+                try {
+                  console.log(`[TwoTap] Prop ${String(prop)}:`, messageModule[prop]);
+                } catch (err3) {
+                  console.error(`[TwoTap] Erreur en acc\xE9dant \xE0 la prop ${String(prop)}:`, err3);
+                }
+              });
+            } else {
+              console.warn("[TwoTap] Message Module introuvable.");
             }
           } catch (error) {
             console.error("[TwoTap] Erreur lors de l'inspection des modules:", error);

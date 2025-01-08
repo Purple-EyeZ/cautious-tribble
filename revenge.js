@@ -16842,42 +16842,50 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       registerPlugin({
         name: "TwoTap",
         author: "YourName",
-        description: "Logs available modules and their properties",
+        description: "Detects taps on messages and logs them",
         id: "vengeance.twotap",
-        version: "1.0.1",
-        icon: "EyeSlashIcon"
+        version: "1.0.6",
+        icon: ""
       }, {
         afterAppRender({ revenge: revenge2, patcher: patcher6, cleanup }) {
           var { findByProps: findByProps2 } = revenge2.modules;
           try {
             var messageModule = findByProps2?.("onPress", "onLongPress");
             console.log("[TwoTap] Message Module:", messageModule);
-            console.log("[TwoTap] Message Module Properties:", Object.keys(messageModule));
             if (messageModule) {
-              var unpatchOnPress = patcher6.after(messageModule, "onPress", (args) => {
-                console.log("[TwoTap] Event intercepted (onPress):", args);
-                var currentTime = Date.now();
-                var timeSinceLastTap = currentTime - lastTapTime;
-                console.log("[TwoTap] Time since last tap:", timeSinceLastTap, "ms");
-                if (timeSinceLastTap < doubleTapThreshold) {
-                  console.log("[TwoTap] Double tap detected (onPress):", args);
+              var props = Object.keys(messageModule);
+              console.log("[TwoTap] Message Module Props:", props);
+              props.forEach((prop) => {
+                try {
+                  console.log(`[TwoTap] Prop ${prop}:`, messageModule[prop]);
+                } catch (err3) {
+                  console.error(`[TwoTap] Erreur en acc\xE9dant \xE0 la prop ${prop}:`, err3);
                 }
-                lastTapTime = currentTime;
               });
-              var unpatchOnLongPress = patcher6.after(messageModule, "onLongPress", (args) => {
-                console.log("[TwoTap] Event intercepted (onLongPress):", args);
-                var currentTime = Date.now();
-                var timeSinceLastTap = currentTime - lastTapTime;
-                console.log("[TwoTap] Time since last tap (onLongPress):", timeSinceLastTap, "ms");
-                if (timeSinceLastTap < doubleTapThreshold) {
-                  console.log("[TwoTap] Double tap detected (onLongPress):", args);
-                }
-                lastTapTime = currentTime;
-              });
-              cleanup(() => {
-                unpatchOnPress();
-                unpatchOnLongPress();
-              });
+              if (messageModule.onPress) {
+                var unpatchOnPress = patcher6.before(messageModule, "onPress", (args) => {
+                  console.log("[TwoTap] onPress intercepted:", args);
+                  var currentTime = Date.now();
+                  var timeSinceLastTap = currentTime - lastTapTime;
+                  if (timeSinceLastTap < doubleTapThreshold) {
+                    console.log("[TwoTap] Double tap detected (onPress):", args);
+                  }
+                  lastTapTime = currentTime;
+                });
+                cleanup(() => unpatchOnPress());
+              }
+              if (messageModule.onLongPress) {
+                var unpatchOnLongPress = patcher6.before(messageModule, "onLongPress", (args) => {
+                  console.log("[TwoTap] onLongPress intercepted:", args);
+                  var currentTime = Date.now();
+                  var timeSinceLastTap = currentTime - lastTapTime;
+                  if (timeSinceLastTap < doubleTapThreshold) {
+                    console.log("[TwoTap] Double tap detected (onLongPress):", args);
+                  }
+                  lastTapTime = currentTime;
+                });
+                cleanup(() => unpatchOnLongPress());
+              }
             } else {
               console.warn("[TwoTap] Message Module introuvable.");
             }

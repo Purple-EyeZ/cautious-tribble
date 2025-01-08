@@ -16152,23 +16152,23 @@ Type: ${asset.type}`,
     DebuggerContext.connected = false;
   }
   function connectToDebugger(addr, revenge2) {
-    var ws = DebuggerContext.ws = new WebSocket(`ws://${addr}`);
-    ws.addEventListener("open", () => {
+    var ws2 = DebuggerContext.ws = new WebSocket(`ws://${addr}`);
+    ws2.addEventListener("open", () => {
       DebuggerContext.connected = true;
       DebuggerEvents.emit("connect");
       DebuggerEvents.emit("*", "connect");
     });
-    ws.addEventListener("close", () => {
+    ws2.addEventListener("close", () => {
       DebuggerContext.connected = false;
       DebuggerEvents.emit("disconnect");
       DebuggerEvents.emit("*", "disconnect");
     });
-    ws.addEventListener("error", (e) => {
+    ws2.addEventListener("error", (e) => {
       DebuggerContext.connected = false;
       DebuggerEvents.emit("error", e);
       DebuggerEvents.emit("*", "error", e);
     });
-    ws.addEventListener("message", (e) => {
+    ws2.addEventListener("message", (e) => {
       try {
         var json = JSON.parse(e.data);
         if (typeof json.code === "string" && typeof json.nonce === "string") {
@@ -16180,7 +16180,7 @@ Type: ${asset.type}`,
           }
           var inspect = revenge2.modules.findProp("inspect");
           try {
-            ws.send(res instanceof Error ? JSON.stringify({
+            ws2.send(res instanceof Error ? JSON.stringify({
               level: "error",
               message: String(res),
               nonce: json.nonce
@@ -16192,7 +16192,7 @@ Type: ${asset.type}`,
               nonce: json.nonce
             }));
           } catch (e2) {
-            ws.send(JSON.stringify({
+            ws2.send(JSON.stringify({
               level: "error",
               message: `DebuggerError: ${String(e2)}`,
               nonce: json.nonce
@@ -16222,24 +16222,24 @@ Type: ${asset.type}`,
     DevToolsContext.connected = false;
   }
   function connectToDevTools(addr) {
-    var ws = DevToolsContext.ws = new WebSocket(`ws://${addr}`);
-    ws.addEventListener("open", () => {
+    var ws2 = DevToolsContext.ws = new WebSocket(`ws://${addr}`);
+    ws2.addEventListener("open", () => {
       DevToolsContext.connected = true;
       DevToolsEvents.emit("connect");
       DevToolsEvents.emit("*", "connect");
     });
-    ws.addEventListener("close", () => {
+    ws2.addEventListener("close", () => {
       DevToolsContext.connected = false;
       DevToolsEvents.emit("disconnect");
       DevToolsEvents.emit("*", "disconnect");
     });
-    ws.addEventListener("error", (e) => {
+    ws2.addEventListener("error", (e) => {
       DevToolsContext.connected = false;
       DevToolsEvents.emit("error", e);
       DevToolsEvents.emit("*", "error", e);
     });
     __reactDevTools.exports.connectToDevTools({
-      websocket: ws
+      websocket: ws2
     });
   }
   var DevToolsEvents, DevToolsContext;
@@ -16838,7 +16838,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       "use strict";
       init_internals();
       lastTapTime = 0;
-      doubleTapThreshold = 500;
+      doubleTapThreshold = 300;
       registerPlugin({
         name: "TwoTap",
         author: "YourName",
@@ -16847,47 +16847,28 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.6",
         icon: ""
       }, {
-        afterAppRender({ revenge: revenge2 }) {
+        afterAppRender({ revenge: revenge2, patcher: patcher6, cleanup }) {
           var { findByProps: findByProps2 } = revenge2.modules;
           try {
             var messageModule = findByProps2?.("onPress", "onLongPress");
-            console.log("[TwoTap] Message Module:", messageModule);
             if (messageModule) {
-              var props = Object.keys(messageModule);
-              console.log("[TwoTap] Message Module Props:", props);
-              props.forEach((prop) => {
-                try {
-                  console.log(`[TwoTap] Prop ${prop}:`, messageModule[prop]);
-                } catch (err3) {
-                  console.error(`[TwoTap] Erreur en acc\xE9dant \xE0 la prop ${prop}:`, err3);
+              var unpatchOnPress = patcher6.before(messageModule, "onPress", (args) => {
+                var currentTime = Date.now();
+                var timeSinceLastTap = currentTime - lastTapTime;
+                if (timeSinceLastTap < doubleTapThreshold) {
+                  console.log("[TwoTap] Double tap d\xE9tect\xE9:", args);
+                  if (ws && ws.readyState === ws.OPEN) {
+                    var message2 = JSON.stringify({
+                      level: "info",
+                      message: "Double tap d\xE9tect\xE9",
+                      details: args
+                    });
+                    ws.send(message2);
+                  }
                 }
+                lastTapTime = currentTime;
               });
-              if (messageModule.onPress) {
-                var originalOnPress = messageModule.onPress;
-                messageModule.onPress = (...args) => {
-                  console.log("[TwoTap] onPress triggered:", args);
-                  var currentTime = Date.now();
-                  var timeSinceLastTap = currentTime - lastTapTime;
-                  if (timeSinceLastTap < doubleTapThreshold) {
-                    console.log("[TwoTap] Double tap detected (onPress):", args);
-                  }
-                  lastTapTime = currentTime;
-                  return originalOnPress(...args);
-                };
-              }
-              if (messageModule.onLongPress) {
-                var originalOnLongPress = messageModule.onLongPress;
-                messageModule.onLongPress = (...args) => {
-                  console.log("[TwoTap] onLongPress triggered:", args);
-                  var currentTime = Date.now();
-                  var timeSinceLastTap = currentTime - lastTapTime;
-                  if (timeSinceLastTap < doubleTapThreshold) {
-                    console.log("[TwoTap] Double tap detected (onLongPress):", args);
-                  }
-                  lastTapTime = currentTime;
-                  return originalOnLongPress(...args);
-                };
-              }
+              cleanup(() => unpatchOnPress());
             } else {
               console.warn("[TwoTap] Message Module introuvable.");
             }

@@ -16851,8 +16851,10 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           var { findByProps: findByProps2 } = revenge2.modules;
           try {
             var messageModule = findByProps2?.("onPress", "onLongPress");
+            console.log("[TwoTap] Message Module:", messageModule);
             if (messageModule) {
-              var unpatch2 = patcher6.before(messageModule, "onPress", (args) => {
+              var unpatchOnPress = patcher6.before(messageModule, "onPress", (args) => {
+                console.log("[TwoTap] Event intercepted:", args);
                 var currentTime = Date.now();
                 var timeSinceLastTap = currentTime - lastTapTime;
                 if (timeSinceLastTap < doubleTapThreshold) {
@@ -16860,7 +16862,19 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                 }
                 lastTapTime = currentTime;
               });
-              cleanup(() => unpatch2());
+              var unpatchOnLongPress = patcher6.before(messageModule, "onLongPress", (args) => {
+                console.log("[TwoTap] Event intercepted:", args);
+                var currentTime = Date.now();
+                var timeSinceLastTap = currentTime - lastTapTime;
+                if (timeSinceLastTap < doubleTapThreshold) {
+                  console.log("[TwoTap] Double tap detected:", args);
+                }
+                lastTapTime = currentTime;
+              });
+              cleanup(() => {
+                unpatchOnPress();
+                unpatchOnLongPress();
+              });
             } else {
               console.warn("[TwoTap] Message Module introuvable.");
             }

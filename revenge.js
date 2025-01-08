@@ -16848,17 +16848,17 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           var { findByProps: findByProps2 } = revenge2.modules;
           try {
             var messageModule = findByProps2?.("onPress", "onLongPress");
-            console.log("[TwoTap] Message Module:", messageModule || "Non trouv\xE9");
-            var messageUtils = findByProps2?.("sendMessage", "editMessage");
-            console.log("[TwoTap] Message Utils:", messageUtils || "Non trouv\xE9");
+            console.log("[TwoTap] Message Module:", messageModule);
+            if (messageModule) {
+              console.log("[TwoTap] Message Module Props:", Object.keys(messageModule));
+            }
             var messageRenderer = findByProps2?.("renderMessage");
-            console.log("[TwoTap] Message Renderer:", messageRenderer || "Non trouv\xE9");
-            if (!messageModule && !messageUtils && !messageRenderer) {
-              console.error("[TwoTap] Aucun module li\xE9 aux messages trouv\xE9.");
-              return;
+            console.log("[TwoTap] Message Renderer:", messageRenderer);
+            if (messageRenderer) {
+              console.log("[TwoTap] Renderer Props:", Object.keys(messageRenderer));
             }
           } catch (error) {
-            console.error("[TwoTap] Erreur lors de la recherche de modules:", error);
+            console.error("[TwoTap] Erreur lors de l'inspection des modules:", error);
           }
         }
       }, {

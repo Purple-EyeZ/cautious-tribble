@@ -16844,7 +16844,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.1",
         icon: "EyeSlashIcon"
       }, {
-        afterAppRender({ revenge: revenge2 }) {
+        beforeAppRender({ revenge: revenge2 }) {
           var { findByProps: findByProps2 } = revenge2.modules;
           var messageModule = findByProps2("onPress", "onLongPress");
           console.log("[TwoTap] Message Module:", messageModule);

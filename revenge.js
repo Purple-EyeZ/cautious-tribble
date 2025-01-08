@@ -16838,7 +16838,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       "use strict";
       init_internals();
       lastTapTime = 0;
-      doubleTapThreshold = 300;
+      doubleTapThreshold = 500;
       registerPlugin({
         name: "TwoTap",
         author: "YourName",
@@ -16854,20 +16854,22 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
             console.log("[TwoTap] Message Module:", messageModule);
             if (messageModule) {
               var unpatchOnPress = patcher6.before(messageModule, "onPress", (args) => {
-                console.log("[TwoTap] Event intercepted:", args);
+                console.log("[TwoTap] Event intercepted (onPress):", args);
                 var currentTime = Date.now();
                 var timeSinceLastTap = currentTime - lastTapTime;
+                console.log("[TwoTap] Time since last tap:", timeSinceLastTap, "ms");
                 if (timeSinceLastTap < doubleTapThreshold) {
-                  console.log("[TwoTap] Double tap detected:", args);
+                  console.log("[TwoTap] Double tap detected (onPress):", args);
                 }
                 lastTapTime = currentTime;
               });
               var unpatchOnLongPress = patcher6.before(messageModule, "onLongPress", (args) => {
-                console.log("[TwoTap] Event intercepted:", args);
+                console.log("[TwoTap] Event intercepted (onLongPress):", args);
                 var currentTime = Date.now();
                 var timeSinceLastTap = currentTime - lastTapTime;
+                console.log("[TwoTap] Time since last tap (onLongPress):", timeSinceLastTap, "ms");
                 if (timeSinceLastTap < doubleTapThreshold) {
-                  console.log("[TwoTap] Double tap detected:", args);
+                  console.log("[TwoTap] Double tap detected (onLongPress):", args);
                 }
                 lastTapTime = currentTime;
               });

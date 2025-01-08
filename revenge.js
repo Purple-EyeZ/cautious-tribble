@@ -16837,23 +16837,18 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
       "use strict";
       init_internals();
       registerPlugin({
-        name: "Test Double Tap",
+        name: "TwoTap",
         author: "YourName",
-        description: "Detects taps on messages and logs them",
-        id: "test.doubletap",
-        version: "1.0.0",
+        description: "Logs available modules and their properties",
+        id: "vengeance.twotap",
+        version: "1.0.1",
         icon: "EyeSlashIcon"
       }, {
-        afterAppRender({ patcher: patcher6, cleanup, revenge: revenge2 }) {
-          var MessageComponent = revenge2.modules.findByProps("onPress", "onLongPress");
-          if (!MessageComponent) {
-            console.error("[Test Double Tap] Message component not found");
-            return;
-          }
-          var unpatch2 = patcher6.before(MessageComponent, "onPress", (args) => {
-            console.log("[Test Double Tap] Message tapped:", args);
+        afterAppRender({ revenge: revenge2 }) {
+          Object.keys(revenge2.modules).forEach((key) => {
+            var module = revenge2.modules[key];
+            console.log(`[TwoTap] Module: ${key}`, module);
           });
-          cleanup(() => unpatch2());
         }
       }, {
         external: false,

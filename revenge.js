@@ -16844,17 +16844,21 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.1",
         icon: "EyeSlashIcon"
       }, {
-        beforeAppRender({ revenge: revenge2 }) {
+        afterAppRender({ revenge: revenge2 }) {
           var { findByProps: findByProps2 } = revenge2.modules;
-          var messageModule = findByProps2("onPress", "onLongPress");
-          console.log("[TwoTap] Message Module:", messageModule);
-          var messageUtils = findByProps2("sendMessage", "editMessage");
-          console.log("[TwoTap] Message Utils:", messageUtils);
-          var messageRenderer = findByProps2("renderMessage");
-          console.log("[TwoTap] Message Renderer:", messageRenderer);
-          if (!messageModule && !messageUtils && !messageRenderer) {
-            console.error("[TwoTap] Aucun module li\xE9 aux messages trouv\xE9");
-            return;
+          try {
+            var messageModule = findByProps2?.("onPress", "onLongPress");
+            console.log("[TwoTap] Message Module:", messageModule || "Non trouv\xE9");
+            var messageUtils = findByProps2?.("sendMessage", "editMessage");
+            console.log("[TwoTap] Message Utils:", messageUtils || "Non trouv\xE9");
+            var messageRenderer = findByProps2?.("renderMessage");
+            console.log("[TwoTap] Message Renderer:", messageRenderer || "Non trouv\xE9");
+            if (!messageModule && !messageUtils && !messageRenderer) {
+              console.error("[TwoTap] Aucun module li\xE9 aux messages trouv\xE9.");
+              return;
+            }
+          } catch (error) {
+            console.error("[TwoTap] Erreur lors de la recherche de modules:", error);
           }
         }
       }, {

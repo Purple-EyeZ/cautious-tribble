@@ -16852,8 +16852,9 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
           try {
             var messageModule = findByProps2?.("onPress", "onLongPress");
             console.log("[TwoTap] Message Module:", messageModule);
+            console.log("[TwoTap] Message Module Properties:", Object.keys(messageModule));
             if (messageModule) {
-              var unpatchOnPress = patcher6.before(messageModule, "onPress", (args) => {
+              var unpatchOnPress = patcher6.after(messageModule, "onPress", (args) => {
                 console.log("[TwoTap] Event intercepted (onPress):", args);
                 var currentTime = Date.now();
                 var timeSinceLastTap = currentTime - lastTapTime;
@@ -16863,7 +16864,7 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
                 }
                 lastTapTime = currentTime;
               });
-              var unpatchOnLongPress = patcher6.before(messageModule, "onLongPress", (args) => {
+              var unpatchOnLongPress = patcher6.after(messageModule, "onLongPress", (args) => {
                 console.log("[TwoTap] Event intercepted (onLongPress):", args);
                 var currentTime = Date.now();
                 var timeSinceLastTap = currentTime - lastTapTime;

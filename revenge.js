@@ -16832,10 +16832,13 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
   });
 
   // src/plugins/vengeance/twotap/index.ts
+  var lastTapTime, doubleTapThreshold;
   var init_twotap = __esm({
     "src/plugins/vengeance/twotap/index.ts"() {
       "use strict";
       init_internals();
+      lastTapTime = 0;
+      doubleTapThreshold = 300;
       registerPlugin({
         name: "TwoTap",
         author: "YourName",
@@ -16844,21 +16847,20 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         version: "1.0.1",
         icon: "EyeSlashIcon"
       }, {
-        afterAppRender({ revenge: revenge2 }) {
+        afterAppRender({ revenge: revenge2, patcher: patcher6, cleanup }) {
           var { findByProps: findByProps2 } = revenge2.modules;
           try {
             var messageModule = findByProps2?.("onPress", "onLongPress");
-            console.log("[TwoTap] Message Module:", messageModule);
             if (messageModule) {
-              var props = Object.keys(messageModule);
-              console.log("[TwoTap] Message Module Props:", props);
-              props.forEach((prop) => {
-                try {
-                  console.log(`[TwoTap] Prop ${String(prop)}:`, messageModule[prop]);
-                } catch (err3) {
-                  console.error(`[TwoTap] Erreur en acc\xE9dant \xE0 la prop ${String(prop)}:`, err3);
+              var unpatch2 = patcher6.before(messageModule, "onPress", (args) => {
+                var currentTime = Date.now();
+                var timeSinceLastTap = currentTime - lastTapTime;
+                if (timeSinceLastTap < doubleTapThreshold) {
+                  console.log("[TwoTap] Double tap detected:", args);
                 }
+                lastTapTime = currentTime;
               });
+              cleanup(() => unpatch2());
             } else {
               console.warn("[TwoTap] Message Module introuvable.");
             }

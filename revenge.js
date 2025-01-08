@@ -16845,10 +16845,17 @@ Your Build: ${ClientInfoModule.Version} (${ClientInfoModule.Build})`
         icon: "EyeSlashIcon"
       }, {
         afterAppRender({ revenge: revenge2 }) {
-          Object.keys(revenge2.modules).forEach((key) => {
-            var module = revenge2.modules[key];
-            console.log(`[TwoTap] Module: ${key}`, module);
-          });
+          var { findByProps: findByProps2 } = revenge2.modules;
+          var messageModule = findByProps2("onPress", "onLongPress");
+          console.log("[TwoTap] Message Module:", messageModule);
+          var messageUtils = findByProps2("sendMessage", "editMessage");
+          console.log("[TwoTap] Message Utils:", messageUtils);
+          var messageRenderer = findByProps2("renderMessage");
+          console.log("[TwoTap] Message Renderer:", messageRenderer);
+          if (!messageModule && !messageUtils && !messageRenderer) {
+            console.error("[TwoTap] Aucun module li\xE9 aux messages trouv\xE9");
+            return;
+          }
         }
       }, {
         external: false,

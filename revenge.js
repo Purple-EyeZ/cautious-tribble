@@ -7394,8 +7394,19 @@ ${errors.map(getErrorStack).join("\n")}`)) : resolve()).catch(reject);
                   if (plugin5.lifecycles.beforeAppRender || plugin5.lifecycles.subscribeModules) showReloadRequiredAlert(enabled2);
                   else yield plugin5.start();
                 } else {
-                  var { reloadRequired } = plugin5.disable();
-                  if (reloadRequired) showReloadRequiredAlert(enabled2);
+                  if (plugin5.manageable !== false) {
+                    var { reloadRequired } = plugin5.disable();
+                    if (reloadRequired) showReloadRequiredAlert(enabled2);
+                  } else {
+                    openAlert("revenge.plugins.settings.plugins.unmanageable", /* @__PURE__ */ jsx(AlertModal, {
+                      title: "Cannot disable plugin",
+                      content: "This plugin cannot be disabled because it is marked as unmanageable.",
+                      actions: /* @__PURE__ */ jsx(AlertActionButton, {
+                        variant: "secondary",
+                        text: "OK"
+                      })
+                    }));
+                  }
                 }
                 rerender();
               });

@@ -7,3 +7,6 @@ ___
 ```
 https://raw.githubusercontent.com/Purple-EyeZ/cautious-tribble/refs/heads/main/revenge.min.js
 ```
+```
+https://raw.githubusercontent.com/Purple-EyeZ/cautious-tribble/refs/heads/main/revenge.js
+```
